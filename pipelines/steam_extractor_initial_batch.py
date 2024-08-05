@@ -24,10 +24,12 @@ def get_app_data():
     for id in get_app_list():
         url = f"https://store.steampowered.com/api/appdetails?appids={id}"
         response = requests.get(url)
-        data = json.dumps(response)
+        data = json.dumps(response.json())
+        print(f"uploading {id}")
         query = f"""INSERT INTO {constants.DATABASE_DUMP_DB} (id, data)
-        VALUES ('{id}','{data}')"""
+        VALUES ('{id}',$${data}$$)"""
         cursor.execute(query)
+        conn.commit()
         time.sleep(1.5)
 
     conn.close()

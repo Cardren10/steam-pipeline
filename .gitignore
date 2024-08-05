@@ -1,4 +1,5 @@
 /.vscode
 /pipelines/__pycache__
+/helpers/__pycache__
 /config.conf
 /test_files
