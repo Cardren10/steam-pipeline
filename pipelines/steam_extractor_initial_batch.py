@@ -1,10 +1,8 @@
-import pandas as pd
 import requests
 import json
 import time
-import psycopg2
-import boto3
-import sys
+from helpers import db_conn
+from helpers import constants
 
 
 def get_app_list():
@@ -20,11 +18,16 @@ def get_app_list():
 
 def get_app_data():
     """loop through app ids to retrieve app details and send it to the database"""
+    conn = db_conn()
+    cursor = conn.cursor()
+
     for id in get_app_list():
         url = f"https://store.steampowered.com/api/appdetails?appids={id}"
         response = requests.get(url)
-        content = response.json()
-        for key in content:
-            print(key)  # upload id to sql
-            print(content[key])  # upload data to data column
-            time.sleep(1.5)
+        data = json.dumps(response)
+        query = f"""INSERT INTO {constants.DATABASE_DUMP_DB} (id, data)
+        VALUES ('{id}','{data}')"""
+        cursor.execute(query)
+        time.sleep(1.5)
+
+    conn.close()

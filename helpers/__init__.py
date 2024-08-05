@@ -1,6 +1,8 @@
-import json
-import boto3
+import psycopg2
+from helpers import constants
 
 
-def get_secret(secret_name: str) -> dict:
-    """connects to a boto3 session and gets a secret from secrets manager."""
+def db_conn():
+    return psycopg2.connect(
+        f"dbname={constants.DATABASE_NAME} user={constants.DATABASE_USER} password={constants.DATABASE_PASSWORD} host={constants.DATABASE_HOST} port={constants.DATABASE_HOST}"
+    )
