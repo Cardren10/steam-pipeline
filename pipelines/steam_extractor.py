@@ -45,8 +45,10 @@ def get_app_data():
         response = requests.get(url)
         data = json.dumps(response.json())
         print(f"uploading {id}")
-        query = f"""INSERT INTO {constants.DATABASE_DUMP_DB} (id, data)
-        VALUES ('{id}',$${data}$$)"""
+        query = cursor.mogrify(
+            f"INSERT INTO {constants.DATABASE_DUMP_DB} (id, data) VALUES (%s, %s)",
+            (id, data),
+        )
         cursor.execute(query)
         conn.commit()
         time.sleep(1.5)
