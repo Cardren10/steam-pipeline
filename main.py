@@ -1,4 +1,4 @@
-from pipelines.steam_extractor_initial_batch import get_app_data
+from pipelines.steam_extractor import get_app_data
 
 
 def main():
