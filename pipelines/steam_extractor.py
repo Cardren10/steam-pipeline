@@ -1,6 +1,7 @@
 import requests
 import json
 import time
+from datetime import datetime, timezone
 from helpers import db_conn
 from helpers import constants
 
@@ -28,9 +29,10 @@ def get_app_list():
 
 
 def filtered_appids():
+    """create a list of uncollected ids"""
     in_sql_set = set(get_already_collected_apps())
-    not_collected_set = set(get_app_list())
-    return list(not_collected_set - in_sql_set)
+    appids_set = set(get_app_list())
+    return list(appids_set - in_sql_set)
 
 
 def get_app_data():
@@ -43,14 +45,22 @@ def get_app_data():
     for id in appids:
         url = f"https://store.steampowered.com/api/appdetails?appids={id}"
         response = requests.get(url)
-        data = json.dumps(response.json())
+        data = json.dumps(response.content.decode("utf-8-sig"))
         print(f"uploading {id}")
         query = cursor.mogrify(
-            f"INSERT INTO {constants.DATABASE_DUMP_DB} (id, data) VALUES (%s, %s)",
-            (id, data),
+            f"INSERT INTO {constants.DATABASE_DUMP_DB} (id, data, source, timestamp) VALUES (%s, %s)",
+            (id, data, "steam_api", datetime.now(timezone.utc).isoformat()),
         )
         cursor.execute(query)
         conn.commit()
         time.sleep(1.5)
 
     conn.close()
+
+
+def main():
+    get_app_data()
+
+
+if __name__ == "__main__":
+    main()
