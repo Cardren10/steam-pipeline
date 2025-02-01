@@ -10,7 +10,7 @@ def get_already_collected_apps():
     """gets all of the apps currently in the postgres database"""
     conn = db_conn()
     cursor = conn.cursor()
-    query = f"""SELECT id FROM {constants.DATABASE_DUMP_DB}"""
+    query = f"""SELECT id FROM {constants.DATABASE_LANDING}"""
     cursor.execute(query)
     records = [i[0] for i in cursor.fetchall()]
     conn.close()
@@ -20,7 +20,10 @@ def get_already_collected_apps():
 def get_app_list():
     """Get app list."""
     url = "https://api.steampowered.com/ISteamApps/GetAppList/v2/"
-    response = requests.get(url)
+    try:
+        response = requests.get(url)
+    except requests.exceptions.RequestException as e:
+        raise Exception(e)
     content = response.content
     content_json = json.loads(content)
     apps = content_json["applist"]["apps"]
@@ -44,11 +47,14 @@ def get_app_data():
 
     for id in appids:
         url = f"https://store.steampowered.com/api/appdetails?appids={id}"
-        response = requests.get(url)
+        try:
+            response = requests.get(url)
+        except requests.exceptions.RequestException as e:
+            raise Exception(e)
         data = json.dumps(response.content.decode("utf-8-sig"))
         print(f"uploading {id}")
         query = cursor.mogrify(
-            f"INSERT INTO {constants.DATABASE_DUMP_DB} (id, data, source, timestamp) VALUES (%s, %s)",
+            f"INSERT INTO {constants.DATABASE_LANDING} (app_id, app_data, source, timestamp) VALUES (%s, %s, %s)",
             (id, data, "steam_api", datetime.now(timezone.utc).isoformat()),
         )
         cursor.execute(query)
@@ -56,11 +62,3 @@ def get_app_data():
         time.sleep(1.5)
 
     conn.close()
-
-
-def main():
-    get_app_data()
-
-
-if __name__ == "__main__":
-    main()
