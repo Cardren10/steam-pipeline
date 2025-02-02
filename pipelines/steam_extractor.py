@@ -10,7 +10,7 @@ def get_already_collected_apps():
     """gets all of the apps currently in the postgres database"""
     conn = db_conn()
     cursor = conn.cursor()
-    query = f"""SELECT id FROM {constants.DATABASE_LANDING}"""
+    query = cursor.mogrify("""SELECT id FROM %s"""), ({constants.DATABASE_LANDING})
     cursor.execute(query)
     records = [i[0] for i in cursor.fetchall()]
     conn.close()
@@ -54,8 +54,15 @@ def get_app_data():
         data = json.dumps(response.content.decode("utf-8-sig"))
         print(f"uploading {id}")
         query = cursor.mogrify(
-            f"INSERT INTO {constants.DATABASE_LANDING} (app_id, app_data, source, timestamp) VALUES (%s, %s, %s)",
-            (id, data, "steam_api", datetime.now(timezone.utc).isoformat()),
+            "INSERT INTO %s (app_id, app_data, source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
+            (
+                {constants.DATABASE_LANDING},
+                id,
+                data,
+                "steam_api",
+                datetime.now(timezone.utc).isoformat(),
+                "0",
+            ),
         )
         cursor.execute(query)
         conn.commit()
