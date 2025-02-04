@@ -1,17 +1,7 @@
-CREATE TABLE steam_landing (
-    id INT PRIMARY KEY SERIAL,
-    app_id INT,
-    app_data JSONB,
-    source CHARACTER(255),
-    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    transformed BOOLEAN,
-);
-
 CREATE TABLE apps (
-    id INT PRIMARY KEY,
+    app_id INT PRIMARY KEY,
     app_name CHARACTER(255),
     app_type CHARACTER(255),
-    genreid INT FOREIGN KEY,
     required_age INT,
     is_free BOOLEAN,
     controller_support CHARACTER(255),
@@ -36,9 +26,14 @@ CREATE TABLE apps (
     platform_linux BOOLEAN
 );
 
-CREATE TABLE app_genres (
-    app_id INT FOREIGN KEY,
-    genre_id INT FOREIGN KEY
+CREATE TABLE steam_landing (
+    id SERIAL PRIMARY KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
+    app_data JSONB,
+    app_source CHARACTER(255),
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    transformed BOOLEAN
 );
 
 CREATE TABLE genres (
@@ -46,36 +41,43 @@ CREATE TABLE genres (
     genre CHARACTER(255)
 );
 
+CREATE TABLE app_genres (
+    app_id INT,
+    genre_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
+    FOREIGN KEY (genre_id) REFERENCES genres(genre_id)
+);
+
 CREATE TABLE dlcs (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     dlc_id INT
 );
 
 CREATE TABLE developers (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     developer CHARACTER(255)
 );
 
 CREATE TABLE publishers (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     publisher CHARACTER(255)
 );
 
 CREATE TABLE prices (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     currency CHARACTER(12),
     initial INT,
-    final INT
+    final_price INT
 );
 
 CREATE TABLE packages (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     package_id INT
-);
-
-CREATE TABLE app_tags (
-    app_id INT FOREIGN KEY,
-    tag_id INT FOREIGN KEY
 );
 
 CREATE TABLE tags (
@@ -83,15 +85,24 @@ CREATE TABLE tags (
     tag CHARACTER(255)
 );
 
+CREATE TABLE app_tags (
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
+    tag_id INT,
+    FOREIGN KEY (tag_id) REFERENCES tags(tag_id)
+);
+
 CREATE TABLE app_screenshots (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     app_screenshots_id INT,
     path_thumbnail TEXT,
     path_full TEXT
-)
+);
 
 CREATE TABLE movies (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     movie_id INT PRIMARY KEY,
     movie_name CHARACTER(255),
     thumbnail TEXT,
@@ -103,7 +114,8 @@ CREATE TABLE movies (
 );
 
 CREATE TABLE ratings (
-    app_id INT FOREIGN KEY,
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     esrb_rating CHARACTER(8),
     esrb_descriptors TEXT,
     esrb_age_gate CHARACTER(8),
@@ -135,6 +147,5 @@ CREATE TABLE ratings (
     steam_germany_descriptors TEXT,
     steam_germany_age_gate CHARACTER(8),
     steam_germany_required_age CHARACTER(8),
-    steam_germany_banned CHARACTER(8),
-
+    steam_germany_banned CHARACTER(8)
 );
