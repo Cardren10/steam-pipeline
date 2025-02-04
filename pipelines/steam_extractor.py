@@ -54,7 +54,7 @@ def get_app_data():
         data = json.dumps(response.content.decode("utf-8-sig"))
         print(f"uploading {id}")
         query = cursor.mogrify(
-            "INSERT INTO %s (app_id, app_data, source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
+            "INSERT INTO %s (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
             (
                 {constants.DATABASE_LANDING},
                 id,

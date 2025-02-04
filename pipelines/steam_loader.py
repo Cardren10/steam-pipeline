@@ -21,7 +21,7 @@ def load_data() -> None:
             """
                 INSERT INTO apps 
                 (
-                    id,
+                    app_id,
                     app_name,
                     app_type,
                     required_age,
@@ -53,7 +53,7 @@ def load_data() -> None:
                     support_email,
                     background,
                     background_raw
-                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
             (
                 appid,
                 data.get("name"),
@@ -182,7 +182,7 @@ def load_data() -> None:
                 (
                     app_id,
                     initial,
-                    final
+                    final_price
                 )
                 VALUES (%s, %s, %s);
             """,
