@@ -8,11 +8,12 @@ def db_conn():
     )
 
 
-def get_handle_null(dict: dict, str: str):
-    if dict == None:
+def get_handle_null(d: dict, str: str):
+    if d == None:
         return None
-    if str not in dict:
-        return None
-    if dict["str"] == None:
-        return None
-    return dict.get(f"{str}")
+    if type(d) == list:
+        if len(d) == 0:
+            return None
+        return d[str]
+    if type(d) == dict:
+        return d.get(str)
