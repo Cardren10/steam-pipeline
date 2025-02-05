@@ -23,13 +23,19 @@ CREATE TABLE apps (
     legal_notice TEXT,
     platform_windows BOOLEAN,
     platform_mac BOOLEAN,
-    platform_linux BOOLEAN
+    platform_linux BOOLEAN,
+    total_achievements INT,
+    coming_soon BOOLEAN,
+    release_date CHARACTER(16),
+    support_url CHARACTER(255),
+    support_email CHARACTER(255),
+    background TEXT,
+    background_raw TEXT
 );
 
 CREATE TABLE steam_landing (
     id SERIAL PRIMARY KEY,
     app_id INT,
-    FOREIGN KEY (app_id) REFERENCES apps(app_id),
     app_data JSONB,
     app_source CHARACTER(255),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
