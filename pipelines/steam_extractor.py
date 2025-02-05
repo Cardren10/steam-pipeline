@@ -1,16 +1,15 @@
+from datetime import datetime, timezone
+from helpers import db_conn
 import requests
 import json
 import time
-from datetime import datetime, timezone
-from helpers import db_conn
-from helpers import constants
 
 
 def get_already_collected_apps():
     """gets all of the apps currently in the postgres database"""
     conn = db_conn()
     cursor = conn.cursor()
-    query = cursor.mogrify("""SELECT id FROM %s"""), ({constants.DATABASE_LANDING})
+    query = "SELECT app_id FROM steam_landing"
     cursor.execute(query)
     records = [i[0] for i in cursor.fetchall()]
     conn.close()
@@ -54,9 +53,8 @@ def get_app_data():
         data = json.dumps(response.content.decode("utf-8-sig"))
         print(f"uploading {id}")
         query = cursor.mogrify(
-            "INSERT INTO %s (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
+            "INSERT INTO steam_landing (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
             (
-                {constants.DATABASE_LANDING},
                 id,
                 data,
                 "steam_api",
