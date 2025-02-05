@@ -1,22 +1,64 @@
-from helpers import db_conn
+from helpers import db_conn, get_handle_null
 from helpers import constants
+import json
 
 
 def load_data() -> None:
     conn = db_conn()
     cursor = conn.cursor()
-    query = cursor.mogrify("""SELECT id, data FROM %s WHERE transformed = 0"""), (
-        {constants.DATABASE_LANDING}
-    )
+    query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0'"
     cursor.execute(query)
     rows = cursor.rowcount
     for i in range(rows):
-        record = cursor.fetchone()
-        appid = record[0]
-        app = record[1]
-        data = app.get(f"{appid}")
+        query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0'"
+        cursor.execute(query)
+        json_string = cursor.fetchone()[1]
+        record = json.loads(json_string)
+        appid = next(iter(record))
+        print(f"appid: {appid}")
+        app_json = record[f"{appid}"]
+        print(f"app: {app_json}")
+
+        if app_json.get("data") == None:
+            print(f"app: {appid} has no data.")
+
+            # Add empty app to apps.
+            query = cursor.mogrify(
+                """
+                    INSERT INTO apps (app_id)
+                    VALUES (%s)
+                """,
+                (appid,),
+            )
+            cursor.execute(query)
+
+            # Update steam_landing to transformed
+            query = cursor.mogrify(
+                """
+                UPDATE steam_landing
+                SET transformed = %s
+                WHERE app_id = %s
+                """,
+                ("1", appid),
+            )
+            cursor.execute(query)
+
+            conn.commit()
+            continue
+
+        data = app_json["data"]
 
         # Query that inserts into the apps table.
+        pc_req = get_handle_null(data, "pc_requirements")
+        mac_req = get_handle_null(data, "mac_requirements")
+        print(f"mac_reqs: {mac_req}")
+        print(f"mac_req type: {type(mac_req)}")
+        lin_req = get_handle_null(data, "linux_requirements")
+        platforms = get_handle_null(data, "platforms")
+        achievements = get_handle_null(data, "achievements")
+        release_date = get_handle_null(data, "release_date")
+        support_info = get_handle_null(data, "support_info")
+
         query = cursor.mogrify(
             """
                 INSERT INTO apps 
@@ -56,247 +98,285 @@ def load_data() -> None:
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
             (
                 appid,
-                data.get("name"),
-                data.get("type"),
-                data.get("required_age"),
-                data.get("is_free"),
-                data.get("controller_support"),
-                data.get("detailed_description"),
-                data.get("about_the_game"),
-                data.get("short_description"),
-                data.get("supported_languages"),
-                data.get("reviews"),
-                data.get("header_image"),
-                data.get("capsule_image"),
-                data.get("capsule_imagev5"),
-                data.get("website"),
-                data.get("pc_requirements").get("minimum"),
-                data.get("pc_requirements").get("recommended"),
-                data.get("mac_requirements").get("minimum"),
-                data.get("mac_requirements").get("recommended"),
-                data.get("linux_requirements").get("minimum"),
-                data.get("linux_requirements").get("recommended"),
-                data.get("legal_notice"),
-                data.get("platforms").get("windows"),
-                data.get("platforms").get("mac"),
-                data.get("platforms").get("linux"),
-                data.get("achievements").get("total"),
-                data.get("release_date").get("coming_soon"),
-                data.get("release_date").get("date"),
-                data.get("support_info").get("url"),
-                data.get("support_info").get("email"),
-                data.get("background"),
-                data.get("background_raw"),
+                get_handle_null(data, "name"),
+                get_handle_null(data, "type"),
+                get_handle_null(data, "required_age"),
+                get_handle_null(data, "is_free"),
+                get_handle_null(data, "controller_support"),
+                get_handle_null(data, "detailed_description"),
+                get_handle_null(data, "about_the_game"),
+                get_handle_null(data, "short_description"),
+                get_handle_null(data, "supported_languages"),
+                get_handle_null(data, "reviews"),
+                get_handle_null(data, "header_image"),
+                get_handle_null(data, "capsule_image"),
+                get_handle_null(data, "capsule_imagev5"),
+                get_handle_null(data, "website"),
+                get_handle_null(pc_req, "minimum"),
+                get_handle_null(pc_req, "recommended"),
+                get_handle_null(mac_req, "minimum"),
+                get_handle_null(mac_req, "recommended"),
+                get_handle_null(lin_req, "minimum"),
+                get_handle_null(lin_req, "recommended"),
+                get_handle_null(data, "legal_notice"),
+                get_handle_null(platforms, "windows"),
+                get_handle_null(platforms, "mac"),
+                get_handle_null(platforms, "linux"),
+                get_handle_null(achievements, "total"),
+                get_handle_null(release_date, "coming_soon"),
+                get_handle_null(release_date, "date"),
+                get_handle_null(support_info, "url"),
+                get_handle_null(support_info, "email"),
+                get_handle_null(data, "background"),
+                get_handle_null(data, "background_raw"),
             ),
         )
         cursor.execute(query)
 
-        # Query that inserts in the app_genres tables.
-        genres = data.get("genres")
-        for genre in genres:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO app_genres 
-                    (
-                        app_id,
-                        genre_id
-                    ) VALUES (%s, %s);""",
-                (appid, genre.get("id")),
-            )
-            cursor.execute(query)
-
         # Query to update genres table if necessary
-        for genre in genres:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO genres 
+        genres = get_handle_null(data, "genres")
+        if genres != None:
+            for genre in genres:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO genres 
+                        (
+                            genre_id,
+                            genre
+                        )
+                        SELECT %s, %s
+                        WHERE NOT EXISTS (
+                            SELECT 1
+                            FROM genres
+                            WHERE genres.genre_id = %s
+                        );""",
                     (
-                        genre_id,
-                        genre
-                    )
-                    SELECT %s, %s
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM genres
-                        WHERE genres.genre_id = %s
-                    );""",
-                (genre.get("id"), genre.get("description"), genre.get("id")),
-            )
-            cursor.execute(query)
+                        get_handle_null(genre, "id"),
+                        get_handle_null(genre, "description"),
+                        get_handle_null(genre, "id"),
+                    ),
+                )
+                cursor.execute(query)
+
+        # Query that inserts in the app_genres tables.
+        if genres != None:
+            print(f"genres found for app:{appid}")
+            for genre in genres:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO app_genres 
+                        (
+                            app_id,
+                            genre_id
+                        ) VALUES (%s, %s);""",
+                    (appid, get_handle_null(genre, "id")),
+                )
+                cursor.execute(query)
 
         # Query that inserts into the dlc table if necissary.
-        if len(data.get("dlc")) > 0:
-            for dlc_id in data.get("dlc"):
-                query = cursor.mogrify(
-                    """
-                        INSERT INTO dlcs
-                        (
-                            app_id,
-                            dlc_id
-                        )
-                        VALUES (%s, %s);
-                    """,
-                    (appid, dlc_id),
-                )
-                cursor.execute(query)
+        dlc = get_handle_null(data, "dlc")
+        if dlc != None:
+            print(f"dlc found for app:{appid}")
+            if len(dlc) > 0:
+                for dlc_id in dlc:
+                    query = cursor.mogrify(
+                        """
+                            INSERT INTO dlcs
+                            (
+                                app_id,
+                                dlc_id
+                            )
+                            VALUES (%s, %s);
+                        """,
+                        (appid, dlc_id),
+                    )
+                    cursor.execute(query)
 
         # Query that inserts developers table.
-        developers = data.get("developers")
-        if len(developers) > 0:
-            for dev in developers:
-                query = cursor.mogrify(
-                    """
-                        INSERT INTO developers
-                        (
-                            app_id,
-                            developer
-                        )
-                        VALUES (%s, %s);
-                    """,
-                    (appid, dev),
-                )
-                cursor.execute(query)
+        developers = get_handle_null(data, "developers")
+        if developers != None:
+            print(f"developers found for app:{appid}")
+            if len(developers) > 0:
+                for dev in developers:
+                    query = cursor.mogrify(
+                        """
+                            INSERT INTO developers
+                            (
+                                app_id,
+                                developer
+                            )
+                            VALUES (%s, %s);
+                        """,
+                        (appid, dev),
+                    )
+                    cursor.execute(query)
 
         # Query that inserts into the publishers table.
-        publishers = data.get("publishers")
-        if len(publishers) > 0:
-            for publisher in publishers:
+        publishers = get_handle_null(data, "publishers")
+        if publishers != None:
+            if len(publishers) > 0:
+                for publisher in publishers:
+                    query = cursor.mogrify(
+                        """
+                            INSERT INTO publishers
+                            (
+                                app_id,
+                                publisher
+                            )
+                            VALUES (%s, %s);
+                        """,
+                        (appid, publisher),
+                    )
+                    cursor.execute(query)
+
+        # Query that inserts in the prices table
+        price = get_handle_null(data, "price_overview")
+        if price != None:
+            query = cursor.mogrify(
+                """
+                    INSERT INTO prices
+                    (
+                        app_id,
+                        initial,
+                        final_price
+                    )
+                    VALUES (%s, %s, %s);
+                """,
+                (
+                    appid,
+                    get_handle_null(price, "initial"),
+                    get_handle_null(price, "final"),
+                ),
+            )
+            cursor.execute(query)
+
+        # Query that inserts into the packages table.
+        packages = get_handle_null(data, "packages")
+        if packages != None:
+            for package in packages:
                 query = cursor.mogrify(
                     """
-                        INSERT INTO publishers
+                        INSERT INTO packages
                         (
                             app_id,
-                            publisher
+                            package_id
                         )
                         VALUES (%s, %s);
                     """,
-                    (appid, publisher),
+                    (appid, package),
                 )
                 cursor.execute(query)
 
-        # Query that inserts in the prices table
-        price = data.get("price_overview")
-        query = cursor.mogrify(
-            """
-                INSERT INTO prices
-                (
-                    app_id,
-                    initial,
-                    final_price
-                )
-                VALUES (%s, %s, %s);
-            """,
-            (appid, price.get("initial"), price.get("final")),
-        )
-        cursor.execute(query)
-
-        # Query that inserts into the packages table.
-        packages = data.get("packages")
-        for package in packages:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO packages
+        # Query that inserts in the tags table.
+        categories = get_handle_null(data, "categories")
+        if categories != None:
+            for tag in categories:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO tags 
+                        (
+                            tag_id,
+                            tag
+                        )
+                        SELECT %s, %s
+                        WHERE NOT EXISTS (
+                            SELECT 1
+                            FROM tags
+                            WHERE tags.tag_id = %s
+                        );
+                    """,
                     (
-                        app_id,
-                        package_id
-                    )
-                    VALUES (%s, %s);
-                """,
-                (appid, package),
-            )
-            cursor.execute(query)
+                        get_handle_null(tag, "id"),
+                        get_handle_null(tag, "description"),
+                        get_handle_null(tag, "id"),
+                    ),
+                )
+                cursor.execute(query)
 
         # Query that inserts in the app_tags tables.
-        categories = data.get("categories")
-        for tag in categories:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO app_tags 
-                    (
-                        app_id,
-                        tag_id
-                    ) VALUES (%s, %s);
-                """,
-                (appid, tag.get("id")),
-            )
-            cursor.execute(query)
-
-        # Query that inserts in the tags table.
-        for tag in categories:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO tags 
-                    (
-                        tag_id,
-                        tag
-                    )
-                    SELECT %s, %s
-                    WHERE NOT EXISTS (
-                        SELECT 1
-                        FROM tags
-                        WHERE tags.tag_id = %s
-                    );
-                """,
-                (tag.get("id"), tag.get("description"), tag.get("id")),
-            )
-            cursor.execute(query)
+        if categories != None:
+            for tag in categories:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO app_tags 
+                        (
+                            app_id,
+                            tag_id
+                        ) VALUES (%s, %s);
+                    """,
+                    (appid, get_handle_null(tag, "id")),
+                )
+                cursor.execute(query)
 
         # Query that inserts into the app_screenshots table
-        screenshots = data.get("screenshots")
-        for screenshot in screenshots:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO app_screenshots 
+        screenshots = get_handle_null(data, "screenshots")
+        if screenshots != None:
+            for screenshot in screenshots:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO app_screenshots 
+                        (
+                            app_id,
+                            app_screenshots_id,
+                            path_thumbnail,
+                            path_full
+                        ) VALUES (%s, %s, %s, %s)
+                    """,
                     (
-                        app_id,
-                        app_screenshots_id,
-                        path_thumbnail,
-                        path_full
-                    ) VALUES (%s, %s, %s, %s)
-                """,
-                (
-                    appid,
-                    screenshot.get("id"),
-                    screenshot.get("path_thumbnail"),
-                    screenshot.get("path_full"),
-                ),
-            )
-            cursor.execute(query)
+                        appid,
+                        get_handle_null(screenshot, "id"),
+                        get_handle_null(screenshot, "path_thumbnail"),
+                        get_handle_null(screenshot, "path_full"),
+                    ),
+                )
+                cursor.execute(query)
 
         # Query that inserts into the movies table.
-        movies = data.get("movies")
-        for movie in movies:
-            query = cursor.mogrify(
-                """
-                    INSERT INTO movies 
+        movies = get_handle_null(data, "movies")
+        if movies != None:
+            for movie in movies:
+                webm = get_handle_null(movie, "webm")
+                mp4 = get_handle_null(movie, "mp4")
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO movies 
+                        (
+                            app_id,
+                            movie_id,
+                            movie_name,
+                            thumbnail,
+                            webm_480,
+                            webm_max,
+                            mp4_480,
+                            mp4_max,
+                            highlight
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                    """,
                     (
-                        app_id,
-                        movie_id,
-                        movie_name,
-                        thumbnail,
-                        webm_480,
-                        webm_max,
-                        mp4_480,
-                        mp4_max,
-                        highlight
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
-                """,
-                (
-                    appid,
-                    movies.get("id"),
-                    movies.get("name"),
-                    movies.get("thumbnail"),
-                    movies.get("webm").get("480"),
-                    movies.get("webm").get("max"),
-                    movies.get("mp4").get("480"),
-                    movies.get("mp4").get("max"),
-                    movies.get("highlight"),
-                ),
-            )
-            cursor.execute(query)
+                        appid,
+                        get_handle_null(movie, "id"),
+                        get_handle_null(movie, "name"),
+                        get_handle_null(movie, "thumbnail"),
+                        get_handle_null(webm, "480"),
+                        get_handle_null(webm, "max"),
+                        get_handle_null(mp4, "480"),
+                        get_handle_null(mp4, "max"),
+                        get_handle_null(movie, "highlight"),
+                    ),
+                )
+                cursor.execute(query)
 
         # Query to add ratings to the ratings table.
-        ratings = data.get("ratings")
+        ratings = get_handle_null(data, "ratings")
+        esrb = get_handle_null(ratings, "esrb")
+        oflc = get_handle_null(ratings, "oflc")
+        crl = get_handle_null(ratings, "crl")
+        usk = get_handle_null(ratings, "usk")
+        dejus = get_handle_null(ratings, "dejus")
+        cero = get_handle_null(ratings, "cero")
+        kgrb = get_handle_null(ratings, "kgrb")
+        csrr = get_handle_null(ratings, "cssr")
+        steam_germany = get_handle_null(ratings, "steam_germany")
         query = cursor.mogrify(
             """
                 INSERT INTO ratings 
@@ -338,38 +418,38 @@ def load_data() -> None:
             """,
             (
                 appid,
-                ratings.get("esrb").get("rating"),
-                ratings.get("esrb").get("descriptors"),
-                ratings.get("esrb").get("use_age_gate"),
-                ratings.get("esrb").get("required_age"),
-                ratings.get("oflc").get("rating"),
-                ratings.get("oflc").get("descriptors"),
-                ratings.get("oflc").get("use_age_gate"),
-                ratings.get("oflc").get("required_age"),
-                ratings.get("crl").get("rating"),
-                ratings.get("crl").get("descriptors"),
-                ratings.get("crl").get("use_age_gate"),
-                ratings.get("crl").get("required_age"),
-                ratings.get("usk").get("rating"),
-                ratings.get("usk").get("descriptors"),
-                ratings.get("usk").get("use_age_gate"),
-                ratings.get("usk").get("required_age"),
-                ratings.get("usk").get("rating_id"),
-                ratings.get("dejus").get("rating"),
-                ratings.get("dejus").get("descriptors"),
-                ratings.get("dejus").get("use_age_gate"),
-                ratings.get("dejus").get("required_age"),
-                ratings.get("cero").get("rating"),
-                ratings.get("cero").get("descriptors"),
-                ratings.get("kgrb").get("rating"),
-                ratings.get("kgrb").get("descriptors"),
-                ratings.get("csrr").get("rating"),
-                ratings.get("csrr").get("descriptors"),
-                ratings.get("steam_germany").get("rating"),
-                ratings.get("steam_germany").get("descriptors"),
-                ratings.get("steam_germany").get("use_age_gate"),
-                ratings.get("steam_germany").get("required_age"),
-                ratings.get("steam_germany").get("banned"),
+                get_handle_null(esrb, "rating"),
+                get_handle_null(esrb, "descriptors"),
+                get_handle_null(esrb, "use_age_gate"),
+                get_handle_null(esrb, "required_age"),
+                get_handle_null(oflc, "rating"),
+                get_handle_null(oflc, "descriptors"),
+                get_handle_null(oflc, "use_age_gate"),
+                get_handle_null(oflc, "required_age"),
+                get_handle_null(crl, "rating"),
+                get_handle_null(crl, "descriptors"),
+                get_handle_null(crl, "use_age_gate"),
+                get_handle_null(crl, "required_age"),
+                get_handle_null(usk, "rating"),
+                get_handle_null(usk, "descriptors"),
+                get_handle_null(usk, "use_age_gate"),
+                get_handle_null(usk, "required_age"),
+                get_handle_null(usk, "rating_id"),
+                get_handle_null(dejus, "rating"),
+                get_handle_null(dejus, "descriptors"),
+                get_handle_null(dejus, "use_age_gate"),
+                get_handle_null(dejus, "required_age"),
+                get_handle_null(cero, "rating"),
+                get_handle_null(cero, "descriptors"),
+                get_handle_null(kgrb, "rating"),
+                get_handle_null(kgrb, "descriptors"),
+                get_handle_null(csrr, "rating"),
+                get_handle_null(csrr, "descriptors"),
+                get_handle_null(steam_germany, "rating"),
+                get_handle_null(steam_germany, "descriptors"),
+                get_handle_null(steam_germany, "use_age_gate"),
+                get_handle_null(steam_germany, "required_age"),
+                get_handle_null(steam_germany, "banned"),
             ),
         )
         cursor.execute(query)
