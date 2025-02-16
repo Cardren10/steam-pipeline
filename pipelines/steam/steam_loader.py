@@ -1,5 +1,7 @@
 from helpers import db_conn, get_handle_null
 from helpers import constants
+from datetime import datetime
+import logging
 import json
 
 
@@ -15,12 +17,12 @@ def load_data() -> None:
         json_string = cursor.fetchone()[1]
         record = json.loads(json_string)
         appid = next(iter(record))
-        print(f"appid: {appid}")
+        logging.debug(f"appid: {appid}")
         app_json = record[f"{appid}"]
-        print(f"app: {app_json}")
+        logging.debug(f"app: {app_json}")
 
         if app_json.get("data") == None:
-            print(f"app: {appid} has no data.")
+            logging.debug(f"app: {appid} has no data.")
 
             # Add empty app to apps.
             query = cursor.mogrify(
@@ -51,8 +53,6 @@ def load_data() -> None:
         # Query that inserts into the apps table.
         pc_req = get_handle_null(data, "pc_requirements")
         mac_req = get_handle_null(data, "mac_requirements")
-        print(f"mac_reqs: {mac_req}")
-        print(f"mac_req type: {type(mac_req)}")
         lin_req = get_handle_null(data, "linux_requirements")
         platforms = get_handle_null(data, "platforms")
         achievements = get_handle_null(data, "achievements")
@@ -124,7 +124,7 @@ def load_data() -> None:
                 get_handle_null(platforms, "linux"),
                 get_handle_null(achievements, "total"),
                 get_handle_null(release_date, "coming_soon"),
-                get_handle_null(release_date, "date"),
+                datetime.strptime(get_handle_null(release_date, "date"), "%Y-%m-%d"),
                 get_handle_null(support_info, "url"),
                 get_handle_null(support_info, "email"),
                 get_handle_null(data, "background"),
@@ -160,7 +160,7 @@ def load_data() -> None:
 
         # Query that inserts in the app_genres tables.
         if genres != None:
-            print(f"genres found for app:{appid}")
+            logging.debug(f"genres found for app:{appid}")
             for genre in genres:
                 query = cursor.mogrify(
                     """
@@ -176,7 +176,7 @@ def load_data() -> None:
         # Query that inserts into the dlc table if necissary.
         dlc = get_handle_null(data, "dlc")
         if dlc != None:
-            print(f"dlc found for app:{appid}")
+            logging.debug(f"dlc found for app:{appid}")
             if len(dlc) > 0:
                 for dlc_id in dlc:
                     query = cursor.mogrify(
@@ -195,7 +195,7 @@ def load_data() -> None:
         # Query that inserts developers table.
         developers = get_handle_null(data, "developers")
         if developers != None:
-            print(f"developers found for app:{appid}")
+            logging.debug(f"developers found for app:{appid}")
             if len(developers) > 0:
                 for dev in developers:
                     query = cursor.mogrify(

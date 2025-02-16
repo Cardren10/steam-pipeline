@@ -26,11 +26,12 @@ CREATE TABLE apps (
     platform_linux BOOLEAN,
     total_achievements INT,
     coming_soon BOOLEAN,
-    release_date CHARACTER(16),
+    release_date DATE,
     support_url CHARACTER(255),
     support_email CHARACTER(255),
     background TEXT,
-    background_raw TEXT
+    background_raw TEXT,
+    timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 );
 
 CREATE TABLE steam_landing (

@@ -1,5 +1,6 @@
 from datetime import datetime, timezone
 from helpers import db_conn
+import logging
 import requests
 import json
 import time
@@ -51,7 +52,7 @@ def get_app_data():
         except requests.exceptions.RequestException as e:
             raise Exception(e)
         data = json.dumps(response.content.decode("utf-8-sig"))
-        print(f"uploading {id}")
+        logging.debug(f"uploading {id}")
         query = cursor.mogrify(
             "INSERT INTO steam_landing (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
             (
