@@ -1,0 +1,46 @@
+name: Deploy Steam-pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+
+  build:
+
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts
+          
+      - name: Deploy to EC2
+        run: |
+          # Create a tar of the project directory
+          tar -czf project.tar.gz ./*
+          
+          # Copy the tar file to EC2
+          scp -i ~/.ssh/id_rsa project.tar.gz ubuntu@${{ secrets.EC2_HOST }}:/tmp/
+          
+          # SSH into EC2, extract the files to destination directory, and clean up
+          ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
+            # Create deployment directory if it doesn't exist
+            mkdir -p /home/ubuntu/app
+            
+            # Extract files to deployment directory
+            tar -xzf /tmp/project.tar.gz -C /home/ubuntu/app
+            
+            # Remove the tar file
+            rm /tmp/project.tar.gz
+            
+            # Restart your application if needed
+            # cd /home/ubuntu/app && ./restart.sh
+          EOF
