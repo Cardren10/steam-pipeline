@@ -43,6 +43,12 @@ jobs:
             
             # Extract files to deployment directory
             tar -xzf /tmp/project.tar.gz -C /home/ubuntu/projects/steam-pipeline
+
+            # Add config to deployment directory
+            touch /home/ubuntu/projects/steam-pipeline/config.conf
+
+            # Add config from secrets to config file.
+            printf "${{ secrets.CONFIG_CONTENTS }}" >> /home/ubuntu/projects/steam-pipeline/config.conf
             
             # Remove the tar file
             rm /tmp/project.tar.gz
