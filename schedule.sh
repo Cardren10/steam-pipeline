@@ -25,32 +25,32 @@ CONTAINER_NAME="your-container-name"
 
 # Check if Docker image exists
 if ! docker image inspect "$IMAGE_NAME" &> /dev/null; then
-    echo "Image does not exist. Building from Dockerfile..."
+    sudo echo "Image does not exist. Building from Dockerfile..."
     if [ -f "$DOCKERFILE" ]; then
-        docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" "$SCRIPT_DIR"
+        sudo docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" "$SCRIPT_DIR"
     else
-        echo "Error: Dockerfile not found at $DOCKERFILE"
+        sudo echo "Error: Dockerfile not found at $DOCKERFILE"
         exit 1
     fi
 else
-    echo "Image $IMAGE_NAME exists."
+    sudo echo "Image $IMAGE_NAME exists."
 fi
 
 # Stop and remove container if it's already running
-if docker ps -a | grep -q "$CONTAINER_NAME"; then
-    echo "Stopping and removing existing container..."
-    docker stop "$CONTAINER_NAME" &> /dev/null
-    docker rm "$CONTAINER_NAME" &> /dev/null
+if sudo docker ps -a | grep -q "$CONTAINER_NAME"; then
+    sudo echo "Stopping and removing existing container..."
+    sudo docker stop "$CONTAINER_NAME" &> /dev/null
+    sudo docker rm "$CONTAINER_NAME" &> /dev/null
 fi
 
 # Run the container
-echo "Starting container $CONTAINER_NAME from image $IMAGE_NAME..."
-docker run -d --name "$CONTAINER_NAME" "$IMAGE_NAME"
-echo "Container started successfully."
+sudo echo "Starting container $CONTAINER_NAME from image $IMAGE_NAME..."
+sudo docker run -d --name "$CONTAINER_NAME" "$IMAGE_NAME"
+sudo echo "Container started successfully."
 EOF
 
-    chmod +x "$DOCKER_SCRIPT"
-    echo "Created docker management script at $DOCKER_SCRIPT"
+    sudo chmod +x "$DOCKER_SCRIPT"
+    sudo echo "Created docker management script at $DOCKER_SCRIPT"
 }
 
 # Function to add a cronjob to run the docker script
@@ -59,31 +59,31 @@ add_cron_job() {
     create_docker_script
     
     # Create a temporary file with current crontab
-    crontab -l 2>/dev/null > /tmp/current_crontab
+    sudo crontab -l 2>/dev/null > /tmp/current_crontab
     
     # Add new cron job to the temporary file
-    echo "$CRON_SCHEDULE $SCRIPT_DIR/docker_manager.sh" >> /tmp/current_crontab
+    sudo echo "$CRON_SCHEDULE $SCRIPT_DIR/docker_manager.sh" >> /tmp/current_crontab
     
     # Install new crontab from the temporary file
-    crontab /tmp/current_crontab
+    sudo crontab /tmp/current_crontab
     
     # Remove the temporary file
-    rm /tmp/current_crontab
+    sudo rm /tmp/current_crontab
     
-    echo "Cron job added successfully."
+    sudo echo "Cron job added successfully."
 }
 
 # Main script execution
-echo "Checking for Dockerfile..."
+sudo echo "Checking for Dockerfile..."
 if [ ! -f "$DOCKERFILE" ]; then
-    echo "Error: Dockerfile not found at $DOCKERFILE"
+    sudo echo "Error: Dockerfile not found at $DOCKERFILE"
     exit 1
 fi
 
-echo "Checking for existing cron job..."
+sudo echo "Checking for existing cron job..."
 if check_cron_exists; then
-    echo "Cron job already exists. No changes made."
+    sudo echo "Cron job already exists. No changes made."
 else
-    echo "No existing cron job found. Adding new cron job..."
+    sudo echo "No existing cron job found. Adding new cron job..."
     add_cron_job
 fi
