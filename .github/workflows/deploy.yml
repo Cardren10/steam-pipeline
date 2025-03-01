@@ -33,14 +33,20 @@ jobs:
           # SSH into EC2, extract the files to destination directory, and clean up
           ssh -i ~/.ssh/id_rsa ubuntu@${{ secrets.EC2_HOST }} << 'EOF'
             # Create deployment directory if it doesn't exist
-            mkdir -p /home/ubuntu/app
+            mkdir -p /home/ubuntu/projects
+
+            # delete old pipeline
+            rm -rf /home/ubuntu/projects/steam-pipeline
+
+            # Create the steam-pipeline directory
+            mkdir /home/ubuntu/projects/steam-pipeline
             
             # Extract files to deployment directory
-            tar -xzf /tmp/project.tar.gz -C /home/ubuntu/app
+            tar -xzf /tmp/project.tar.gz -C /home/ubuntu/projects/steam-pipeline
             
             # Remove the tar file
             rm /tmp/project.tar.gz
             
             # Restart your application if needed
-            # cd /home/ubuntu/app && ./restart.sh
+            # cd /home/ubuntu/projects && ./schedule.sh
           EOF
