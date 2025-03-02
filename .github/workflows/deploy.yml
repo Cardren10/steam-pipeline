@@ -54,5 +54,5 @@ jobs:
             rm /tmp/project.tar.gz
             
             # Restart your application if needed
-            # cd /home/ubuntu/projects && ./schedule.sh
+            # cd /home/ubuntu/projects && bash ./schedule.sh
           EOF
