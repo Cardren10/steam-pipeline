@@ -1,6 +1,14 @@
-# Developer Setup
+# Steam Data pipeline
 
-1. Create a virtual envirornment by typing "python -m venv project_env" into your terminal.
-2. run ".\project_env\Scripts\Activate.ps1" in terminal to activate the virtual enviornment.
-3. to download all requierments you can run "pip install -r .\requirements.txt"
+## Summary
+This project is a data pipeline for the popular video game store steam. The pipeline collects data directly from the steam api daily and processes it through an ELT pipeline that cleans the data and prepares it for use in transactional or analytical workloads.
 
+## Tools and Infrastructure
+* Database: PostgreSQL
+* Languages: Python, SQL, Bash
+* Vizualization: Tableau
+* Cloud: AWS
+* Containerization: Docker
+
+## Architecture
+[Uploading architectureDiagram.drawio…]()
