@@ -11,4 +11,3 @@ This project is a data pipeline for the popular video game store steam. The pipe
 * Containerization: Docker
 
 ## Architecture
-[Uploading architectureDiagram.drawio…]()
