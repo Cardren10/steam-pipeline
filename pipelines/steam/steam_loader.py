@@ -124,7 +124,7 @@ def load_data() -> None:
                 get_handle_null(platforms, "linux"),
                 get_handle_null(achievements, "total"),
                 get_handle_null(release_date, "coming_soon"),
-                datetime.strptime(get_handle_null(release_date, "date"), "%Y-%m-%d"),
+                get_handle_null(release_date, "date"),
                 get_handle_null(support_info, "url"),
                 get_handle_null(support_info, "email"),
                 get_handle_null(data, "background"),

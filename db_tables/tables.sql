@@ -26,7 +26,7 @@ CREATE TABLE apps (
     platform_linux BOOLEAN,
     total_achievements INT,
     coming_soon BOOLEAN,
-    release_date DATE,
+    release_date TEXT,
     support_url CHARACTER(255),
     support_email CHARACTER(255),
     background TEXT,
