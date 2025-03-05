@@ -1,16 +1,19 @@
-from helpers import db_conn, get_handle_null
-from helpers import constants
-from datetime import datetime
+from helpers import db_conn, get_handle_null, setup_logger
 import logging
 import json
 
 
 def load_data() -> None:
+    logger = logging.getLogger("steam-pipeline")
+    setup_logger()
+    logger.debug("debug")
+
     conn = db_conn()
     cursor = conn.cursor()
     query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0'"
     cursor.execute(query)
     rows = cursor.rowcount
+    logging.debug(f"rowcount: {rows}")
     for i in range(rows):
         query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0'"
         cursor.execute(query)

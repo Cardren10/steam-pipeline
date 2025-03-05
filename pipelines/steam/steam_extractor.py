@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from helpers import db_conn
+from helpers import db_conn, setup_logger
 import logging
 import requests
 import json
@@ -40,6 +40,10 @@ def filtered_appids():
 
 def get_app_data():
     """loop through app ids to retrieve app details and send it to the database"""
+    logger = logging.getLogger("steam-pipeline")
+    setup_logger()
+    logger.debug("debug")
+
     appids = filtered_appids()
 
     conn = db_conn()

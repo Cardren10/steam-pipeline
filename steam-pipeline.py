@@ -3,7 +3,9 @@ from pipelines.steam.steam_loader import load_data
 
 
 def main():
+    print("Getting app data.")
     get_app_data()
+    print("loading data into schema.")
     load_data()
 
 

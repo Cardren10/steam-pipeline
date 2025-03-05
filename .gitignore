@@ -4,5 +4,5 @@ __pycache__
 /test_files
 /project_env
 *.pem
-*.json
 *.png
+*.log*
