@@ -10,12 +10,12 @@ def load_data() -> None:
 
     conn = db_conn()
     cursor = conn.cursor()
-    query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0'"
+    query = "SELECT count(*) FROM steam_landing WHERE transformed = '0'"
     cursor.execute(query)
-    rows = cursor.rowcount
+    rows = cursor.fetchone()[0]
     logging.debug(f"rowcount: {rows}")
-    for i in range(rows):
-        query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0'"
+    for row in range(rows):
+        query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' LIMIT 1"
         cursor.execute(query)
         json_string = cursor.fetchone()[1]
         record = json.loads(json_string)
