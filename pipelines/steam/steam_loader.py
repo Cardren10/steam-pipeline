@@ -1,4 +1,4 @@
-from helpers import db_conn, get_handle_null, setup_logger
+from helpers import db_conn, get_handle_null, setup_logger, validate_json
 import logging
 import json
 
@@ -14,10 +14,34 @@ def load_data() -> None:
     cursor.execute(query)
     rows = cursor.fetchone()[0]
     logging.debug(f"rowcount: {rows}")
+
     for row in range(rows):
         query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' LIMIT 1"
         cursor.execute(query)
         json_string = cursor.fetchone()[1]
+        if not validate_json(json_string):
+
+            query = (
+                "SELECT id, app_data FROM steam_landing WHERE transformed = '0' LIMIT 1"
+            )
+            cursor.execute(query)
+            landing_id = cursor.fetchone()[0]
+            logging.warning(f"Invalid json found for landing_id: {landing_id}")
+
+            # Update steam_landing to transformed
+            query = cursor.mogrify(
+                """
+                UPDATE steam_landing
+                SET transformed = %s
+                WHERE id = %s
+                """,
+                ("1", landing_id),
+            )
+            cursor.execute(query)
+
+            conn.commit()
+            continue
+
         record = json.loads(json_string)
         appid = next(iter(record))
         logging.debug(f"appid: {appid}")
