@@ -5,5 +5,4 @@ __pycache__
 /project_env
 *.pem
 *.png
-*.log*
 *.ipynb
