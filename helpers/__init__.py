@@ -34,3 +34,11 @@ def setup_logger() -> None:
     if queue_handler is not None:
         queue_handler.listener.start()
         atexit.register(queue_handler.listener.stop)
+
+
+def validate_json(json_str) -> bool:
+    try:
+        json.loads(json_str)
+        return True
+    except ValueError:
+        return False
