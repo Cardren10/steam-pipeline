@@ -353,7 +353,8 @@ def load_data() -> None:
                             mp4_480,
                             mp4_max,
                             highlight
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s);
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (movie_id) DO NOTHING;
                     """,
                     (
                         appid,
