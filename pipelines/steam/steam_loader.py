@@ -1,4 +1,4 @@
-from helpers import db_conn, get_handle_null, setup_logger, validate_json
+from helpers import db_conn, get_handle_null, setup_logger, validate_json, validate_int
 import logging
 import json
 
@@ -127,7 +127,7 @@ def load_data() -> None:
                 appid,
                 get_handle_null(data, "name"),
                 get_handle_null(data, "type"),
-                get_handle_null(data, "required_age"),
+                validate_int(get_handle_null(data, "required_age")),
                 get_handle_null(data, "is_free"),
                 get_handle_null(data, "controller_support"),
                 get_handle_null(data, "detailed_description"),
@@ -149,7 +149,7 @@ def load_data() -> None:
                 get_handle_null(platforms, "windows"),
                 get_handle_null(platforms, "mac"),
                 get_handle_null(platforms, "linux"),
-                get_handle_null(achievements, "total"),
+                validate_int(get_handle_null(achievements, "total")),
                 get_handle_null(release_date, "coming_soon"),
                 get_handle_null(release_date, "date"),
                 get_handle_null(support_info, "url"),

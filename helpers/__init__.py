@@ -42,3 +42,9 @@ def validate_json(json_str) -> bool:
         return True
     except ValueError:
         return False
+
+
+def validate_int(int_value):
+    if type(int_value) == int:
+        return int_value
+    return None
