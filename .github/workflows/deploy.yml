@@ -54,5 +54,5 @@ jobs:
             rm /tmp/project.tar.gz
             
             # Rebuild docker image and restart your application if needed
-            # cd /home/ubuntu/projects && bash ./docker_manager.sh && bash ./schedule.sh
+            cd /home/ubuntu/projects/steam-pipeline && bash ./docker_manager.sh && bash ./schedule.sh
           EOF
