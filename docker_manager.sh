@@ -25,8 +25,3 @@ else
     sudo docker rmi -f steam-pipeline
     sudo docker build -t "$IMAGE_NAME" -f "$DOCKERFILE" "$SCRIPT_DIR"
 fi
-
-# Run the container
-echo "Starting container $CONTAINER_NAME from image $IMAGE_NAME..."
-sudo docker run "$IMAGE_NAME"
-echo "Container started successfully."
