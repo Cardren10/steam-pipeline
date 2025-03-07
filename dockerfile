@@ -1,4 +1,4 @@
-FROM python:3.11-bookworm
+FROM python:3-slim-bookworm
 WORKDIR /steam-pipeline
 
 RUN apt-get update && apt-get -y upgrade && apt-get install -y gcc
