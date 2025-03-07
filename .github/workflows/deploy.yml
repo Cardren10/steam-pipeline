@@ -53,6 +53,6 @@ jobs:
             # Remove the tar file
             rm /tmp/project.tar.gz
             
-            # Restart your application if needed
-            # cd /home/ubuntu/projects && bash ./schedule.sh
+            # Rebuild docker image and restart your application if needed
+            # cd /home/ubuntu/projects && bash ./docker_manager.sh && bash ./schedule.sh
           EOF
