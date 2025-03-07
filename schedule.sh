@@ -5,17 +5,16 @@ DOCKERFILE="$SCRIPT_DIR/dockerfile"
 IMAGE_NAME="steam-pipeline"
 CONTAINER_NAME="steam-container"
 CRON_SCHEDULE="0 7 * * *"
-DOCKER_SCRIPT="$SCRIPT_DIR/docker_manage.sh"
 
 # Function to check if cron job exists (for current user)
 check_cron_exists() {
-    crontab -l 2>/dev/null | grep -q "$DOCKER_SCRIPT"
+    crontab -l 2>/dev/null | grep -q "sudo docker run $IMAGE_NAME"
 }
 
 # Function to add a cronjob to run the docker script (for current user)
 add_cron_job() {
     echo "Adding new cron job..."
-    (crontab -l 2>/dev/null; echo "$CRON_SCHEDULE $DOCKER_SCRIPT") | crontab -
+    (crontab -l 2>/dev/null; echo "$CRON_SCHEDULE sudo docker run "$IMAGE_NAME"") | crontab -
     echo "Cron job added successfully."
 }
 
