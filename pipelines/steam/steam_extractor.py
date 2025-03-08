@@ -14,12 +14,17 @@ class SteamExtractor:
         helpers.setup_logger()
         logger.debug("debug")
 
+        start = time.time()
+
         logging.debug("getting app details.")
         self.get_app_details()
         logging.debug("getting app reviews.")
         self.get_app_reviews()
         logging.debug("getting app tags.")
         self.get_app_tags()
+
+        end = time.time()
+        logging.debug(f"Extractor ran for {end - start} seconds")
 
     def get_already_collected_apps(self, source: str) -> list:
         """gets all of the apps currently in the postgres database"""
@@ -31,7 +36,7 @@ class SteamExtractor:
             FROM steam_landing
             WHERE source = %s
             """,
-            (source),
+            (source,),
         )
         cursor.execute(query)
         records = [i[0] for i in cursor.fetchall()]
@@ -78,7 +83,7 @@ class SteamExtractor:
                 continue
             logging.debug(f"uploading app details for {id}")
             query = cursor.mogrify(
-                "INSERT INTO steam_landing (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO steam_landing (app_id, app_data, source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
                 (
                     id,
                     data,
@@ -116,7 +121,7 @@ class SteamExtractor:
                 continue
             logging.debug(f"uploading reviews for {id}")
             query = cursor.mogrify(
-                "INSERT INTO steam_landing (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO steam_landing (app_id, app_data, source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
                 (
                     id,
                     data,
@@ -153,7 +158,7 @@ class SteamExtractor:
                 continue
             logging.debug(f"uploading tags for {id}")
             query = cursor.mogrify(
-                "INSERT INTO steam_landing (app_id, app_data, app_source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
+                "INSERT INTO steam_landing (app_id, app_data, source, timestamp, transformed) VALUES (%s, %s, %s, %s, %s)",
                 (
                     id,
                     data,

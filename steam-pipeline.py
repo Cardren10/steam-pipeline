@@ -10,12 +10,15 @@ def main():
     helpers.setup_logger()
     logger.debug("debug")
 
+    Extractor = SteamExtractor()
+    Loader = SteamLoader()
+
     start = time.time()
 
     logging.debug("Getting app data.")
-    SteamExtractor.execute()
+    Extractor.execute()
     logging.debug("loading data into schema.")
-    SteamLoader.execute()
+    Loader.execute()
 
     end = time.time()
     logging.debug(f"pipeline ran for {end - start} seconds")
