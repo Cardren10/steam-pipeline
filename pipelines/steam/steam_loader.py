@@ -1,6 +1,7 @@
 import helpers
 import logging
 import json
+import time
 
 
 class SteamLoader:
@@ -10,8 +11,17 @@ class SteamLoader:
         helpers.setup_logger()
         logger.debug("debug")
 
+        start = time.time()
+
         logging.debug("loading app details.")
         self.load_app_details()
+        logging.debug("loading app reviews.")
+        self.load_app_reviews()
+        logging.debug("loading app tags.")
+        self.load_app_tags()
+
+        end = time.time()
+        logging.debug(f"Loader ran for {end - start} seconds")
 
     def load_app_details() -> None:
         """Loops through all non-transformed app details for appids and loads the data into the schema."""
@@ -52,7 +62,6 @@ class SteamLoader:
             appid = next(iter(record))
             logging.debug(f"appid: {appid}")
             app_json = record[f"{appid}"]
-            logging.debug(f"app: {app_json}")
 
             if app_json.get("data") == None:
                 logging.debug(f"app: {appid} has no data.")
@@ -504,6 +513,206 @@ class SteamLoader:
                     WHERE app_id = %s AND source = %s
                 """,
                 ("1", appid, "steam_api_appdetails"),
+            )
+            cursor.execute(query)
+
+            # When Psycopg2 executes a query it does so as a transaction that does not complete until commit is run. Any failure before this should send an error that includes what appid specifically failed.
+            conn.commit()
+
+        conn.close()
+
+    def load_app_reviews() -> None:
+        conn = helpers.db_conn()
+        cursor = conn.cursor()
+        query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews'"
+        cursor.execute(query)
+        rows = cursor.fetchone()[0]
+        logging.debug(f"rowcount: {rows}")
+
+        for row in range(rows):
+            query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews' LIMIT 1"
+            cursor.execute(query)
+            json_string = cursor.fetchone()[1]
+            if not helpers.validate_json(json_string):
+
+                query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews' LIMIT 1"
+                cursor.execute(query)
+                landing_id = cursor.fetchone()[0]
+                logging.warning(f"Invalid json found for landing_id: {landing_id}")
+
+                # Update steam_landing to transformed
+                query = cursor.mogrify(
+                    """
+                    UPDATE steam_landing
+                    SET transformed = %s
+                    WHERE id = %s
+                    """,
+                    ("1", landing_id),
+                )
+                cursor.execute(query)
+
+                conn.commit()
+                continue
+
+            record = json.loads(json_string)
+            appid = next(iter(record))
+            logging.debug(f"appid: {appid}")
+            app_json = record[f"{appid}"]
+
+            if app_json.get("query_summary") == None:
+                logging.debug(f"app: {appid} has no data.")
+
+                # Update steam_landing to transformed
+                query = cursor.mogrify(
+                    """
+                    UPDATE steam_landing
+                    SET transformed = %s
+                    WHERE app_id = %s AND source = %s
+                    """,
+                    ("1", appid, "steam_api_appreviews"),
+                )
+                cursor.execute(query)
+
+                conn.commit()
+                continue
+
+            data = app_json["query_summary"]
+
+            # Query that inserts into the reviews table.
+            query = cursor.mogrify(
+                """
+                    INSERT INTO reviews 
+                    (
+                        app_id,
+                        review_score,
+                        review_score_desc,
+                        total_positive,
+                        total_negative,
+                        total_reviews,
+                    ) VALUES (%s, %s, %s, %s, %s, %s);""",
+                (
+                    appid,
+                    helpers.get_handle_null(data, "review_score"),
+                    helpers.get_handle_null(data, "review_score_desc"),
+                    helpers.get_handle_null(data, "total_positive"),
+                    helpers.get_handle_null(data, "total_negative"),
+                    helpers.get_handle_null(data, "total_reviews"),
+                ),
+            )
+            cursor.execute(query)
+
+            # Query to update the landing transformed value.
+            query = cursor.mogrify(
+                """
+                    UPDATE steam_landing
+                    SET transformed = %s
+                    WHERE app_id = %s AND source = %s
+                """,
+                ("1", appid, "steam_api_appreviews"),
+            )
+            cursor.execute(query)
+
+            # When Psycopg2 executes a query it does so as a transaction that does not complete until commit is run. Any failure before this should send an error that includes what appid specifically failed.
+            conn.commit()
+
+        conn.close()
+
+    def load_app_tags() -> None:
+        conn = helpers.db_conn()
+        cursor = conn.cursor()
+        query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags'"
+        cursor.execute(query)
+        rows = cursor.fetchone()[0]
+        logging.debug(f"rowcount: {rows}")
+
+        for row in range(rows):
+            query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags' LIMIT 1"
+            cursor.execute(query)
+            json_string = cursor.fetchone()[1]
+            if not helpers.validate_json(json_string):
+
+                query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags' LIMIT 1"
+                cursor.execute(query)
+                landing_id = cursor.fetchone()[0]
+                logging.warning(f"Invalid json found for landing_id: {landing_id}")
+
+                # Update steam_landing to transformed
+                query = cursor.mogrify(
+                    """
+                    UPDATE steam_landing
+                    SET transformed = %s
+                    WHERE id = %s
+                    """,
+                    ("1", landing_id),
+                )
+                cursor.execute(query)
+
+                conn.commit()
+                continue
+
+            record = json.loads(json_string)
+            appid = next(iter(record))
+            logging.debug(f"appid: {appid}")
+            app_json = record[f"{appid}"]
+
+            if app_json.get("tags") == None:
+                logging.debug(f"app: {appid} has no data.")
+
+                # Update steam_landing to transformed
+                query = cursor.mogrify(
+                    """
+                    UPDATE steam_landing
+                    SET transformed = %s
+                    WHERE app_id = %s AND source = %s
+                    """,
+                    ("1", appid, "steamspy_tags"),
+                )
+                cursor.execute(query)
+
+                conn.commit()
+                continue
+
+            # Query that inserts into the tags table.
+            tags = app_json["tags"]
+
+            for k, v in tags:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO tags 
+                        (
+                            tag_id,
+                            tag,
+                        ) SELECT %s, %s
+                        WHERE NOT EXISTS (
+                            SELECT 1
+                            FROM tags
+                            WHERE tags.tag_id = %s
+                        );""",
+                    (
+                        v,
+                        k,
+                        v,
+                    ),
+                )
+                cursor.execute(query)
+
+            for k, v in tags:
+                query = cursor.mogrify(
+                    """
+                        INSERT INTO app_tags
+                        VALUES (%s, %s);
+                    """,
+                    (appid, v),
+                )
+
+            # Query to update the landing transformed value.
+            query = cursor.mogrify(
+                """
+                    UPDATE steam_landing
+                    SET transformed = %s
+                    WHERE app_id = %s AND source = %s
+                """,
+                ("1", appid, "steamspy_tags"),
             )
             cursor.execute(query)
 
