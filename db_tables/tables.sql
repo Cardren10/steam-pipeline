@@ -38,7 +38,7 @@ CREATE TABLE steam_landing (
     id SERIAL PRIMARY KEY,
     app_id INT,
     app_data JSONB,
-    app_source CHARACTER(255),
+    source CHARACTER(255),
     timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     transformed BOOLEAN
 );
@@ -87,16 +87,16 @@ CREATE TABLE packages (
     package_id INT
 );
 
-CREATE TABLE tags (
-    tag_id INT PRIMARY KEY,
-    tag CHARACTER(255)
+CREATE TABLE categories (
+    category_id INT PRIMARY KEY,
+    category CHARACTER(255)
 );
 
-CREATE TABLE app_tags (
+CREATE TABLE app_categories (
     app_id INT,
     FOREIGN KEY (app_id) REFERENCES apps(app_id),
-    tag_id INT,
-    FOREIGN KEY (tag_id) REFERENCES tags(tag_id)
+    category_id INT,
+    FOREIGN KEY (category_id) REFERENCES categories(category_id)
 );
 
 CREATE TABLE app_screenshots (
@@ -155,4 +155,26 @@ CREATE TABLE ratings (
     steam_germany_age_gate TEXT,
     steam_germany_required_age TEXT,
     steam_germany_banned TEXT
+);
+
+CREATE TABLE reviews (
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
+    review_score INT,
+    review_score_desc TEXT,
+    total_positive INT,
+    total_negative INT,
+    total_reviews INT
+)
+
+CREATE TABLE tags (
+    tag_id INT PRIMARY KEY,
+    tag CHARACTER(255)
+);
+
+CREATE TABLE app_tags (
+    app_id INT,
+    FOREIGN KEY (app_id) REFERENCES apps(app_id),
+    tag_id INT,
+    FOREIGN KEY (tag_id) REFERENCES tags(tag_id)
 );
