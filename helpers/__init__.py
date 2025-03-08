@@ -6,6 +6,7 @@ import logging
 import logging.config
 import logging.handlers
 import atexit
+from bs4 import BeautifulSoup
 
 
 def db_conn():
@@ -48,3 +49,10 @@ def validate_int(int_value):
     if type(int_value) == int:
         return int_value
     return None
+
+
+def clean_html(text) -> str:
+    if text == None:
+        return None
+    soup = BeautifulSoup(text, "html.parser")
+    return soup.get_text()

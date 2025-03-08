@@ -1,14 +1,14 @@
-from helpers import db_conn, get_handle_null, setup_logger, validate_json, validate_int
+import helpers
 import logging
 import json
 
 
 def load_data() -> None:
     logger = logging.getLogger("steam-pipeline")
-    setup_logger()
+    helpers.setup_logger()
     logger.debug("debug")
 
-    conn = db_conn()
+    conn = helpers.db_conn()
     cursor = conn.cursor()
     query = "SELECT count(*) FROM steam_landing WHERE transformed = '0'"
     cursor.execute(query)
@@ -19,7 +19,7 @@ def load_data() -> None:
         query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' LIMIT 1"
         cursor.execute(query)
         json_string = cursor.fetchone()[1]
-        if not validate_json(json_string):
+        if not helpers.validate_json(json_string):
 
             query = (
                 "SELECT id, app_data FROM steam_landing WHERE transformed = '0' LIMIT 1"
@@ -78,13 +78,13 @@ def load_data() -> None:
         data = app_json["data"]
 
         # Query that inserts into the apps table.
-        pc_req = get_handle_null(data, "pc_requirements")
-        mac_req = get_handle_null(data, "mac_requirements")
-        lin_req = get_handle_null(data, "linux_requirements")
-        platforms = get_handle_null(data, "platforms")
-        achievements = get_handle_null(data, "achievements")
-        release_date = get_handle_null(data, "release_date")
-        support_info = get_handle_null(data, "support_info")
+        pc_req = helpers.get_handle_null(data, "pc_requirements")
+        mac_req = helpers.get_handle_null(data, "mac_requirements")
+        lin_req = helpers.get_handle_null(data, "linux_requirements")
+        platforms = helpers.get_handle_null(data, "platforms")
+        achievements = helpers.get_handle_null(data, "achievements")
+        release_date = helpers.get_handle_null(data, "release_date")
+        support_info = helpers.get_handle_null(data, "support_info")
 
         query = cursor.mogrify(
             """
@@ -125,43 +125,47 @@ def load_data() -> None:
                 ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
             (
                 appid,
-                get_handle_null(data, "name"),
-                get_handle_null(data, "type"),
-                validate_int(get_handle_null(data, "required_age")),
-                get_handle_null(data, "is_free"),
-                get_handle_null(data, "controller_support"),
-                get_handle_null(data, "detailed_description"),
-                get_handle_null(data, "about_the_game"),
-                get_handle_null(data, "short_description"),
-                get_handle_null(data, "supported_languages"),
-                get_handle_null(data, "reviews"),
-                get_handle_null(data, "header_image"),
-                get_handle_null(data, "capsule_image"),
-                get_handle_null(data, "capsule_imagev5"),
-                get_handle_null(data, "website"),
-                get_handle_null(pc_req, "minimum"),
-                get_handle_null(pc_req, "recommended"),
-                get_handle_null(mac_req, "minimum"),
-                get_handle_null(mac_req, "recommended"),
-                get_handle_null(lin_req, "minimum"),
-                get_handle_null(lin_req, "recommended"),
-                get_handle_null(data, "legal_notice"),
-                get_handle_null(platforms, "windows"),
-                get_handle_null(platforms, "mac"),
-                get_handle_null(platforms, "linux"),
-                validate_int(get_handle_null(achievements, "total")),
-                get_handle_null(release_date, "coming_soon"),
-                get_handle_null(release_date, "date"),
-                get_handle_null(support_info, "url"),
-                get_handle_null(support_info, "email"),
-                get_handle_null(data, "background"),
-                get_handle_null(data, "background_raw"),
+                helpers.get_handle_null(data, "name"),
+                helpers.get_handle_null(data, "type"),
+                helpers.validate_int(helpers.get_handle_null(data, "required_age")),
+                helpers.get_handle_null(data, "is_free"),
+                helpers.get_handle_null(data, "controller_support"),
+                helpers.clean_html(
+                    helpers.get_handle_null(data, "detailed_description")
+                ),
+                helpers.clean_html(helpers.get_handle_null(data, "about_the_game")),
+                helpers.clean_html(helpers.get_handle_null(data, "short_description")),
+                helpers.clean_html(
+                    helpers.get_handle_null(data, "supported_languages")
+                ),
+                helpers.clean_html(helpers.get_handle_null(data, "reviews")),
+                helpers.get_handle_null(data, "header_image"),
+                helpers.get_handle_null(data, "capsule_image"),
+                helpers.get_handle_null(data, "capsule_imagev5"),
+                helpers.get_handle_null(data, "website"),
+                helpers.clean_html(helpers.get_handle_null(pc_req, "minimum")),
+                helpers.clean_html(helpers.get_handle_null(pc_req, "recommended")),
+                helpers.clean_html(helpers.get_handle_null(mac_req, "minimum")),
+                helpers.clean_html(helpers.get_handle_null(mac_req, "recommended")),
+                helpers.clean_html(helpers.get_handle_null(lin_req, "minimum")),
+                helpers.clean_html(helpers.get_handle_null(lin_req, "recommended")),
+                helpers.clean_html(helpers.get_handle_null(data, "legal_notice")),
+                helpers.get_handle_null(platforms, "windows"),
+                helpers.get_handle_null(platforms, "mac"),
+                helpers.get_handle_null(platforms, "linux"),
+                helpers.validate_int(helpers.get_handle_null(achievements, "total")),
+                helpers.get_handle_null(release_date, "coming_soon"),
+                helpers.get_handle_null(release_date, "date"),
+                helpers.get_handle_null(support_info, "url"),
+                helpers.get_handle_null(support_info, "email"),
+                helpers.get_handle_null(data, "background"),
+                helpers.get_handle_null(data, "background_raw"),
             ),
         )
         cursor.execute(query)
 
         # Query to update genres table if necessary
-        genres = get_handle_null(data, "genres")
+        genres = helpers.get_handle_null(data, "genres")
         if genres != None:
             for genre in genres:
                 query = cursor.mogrify(
@@ -178,9 +182,9 @@ def load_data() -> None:
                             WHERE genres.genre_id = %s
                         );""",
                     (
-                        get_handle_null(genre, "id"),
-                        get_handle_null(genre, "description"),
-                        get_handle_null(genre, "id"),
+                        helpers.get_handle_null(genre, "id"),
+                        helpers.get_handle_null(genre, "description"),
+                        helpers.get_handle_null(genre, "id"),
                     ),
                 )
                 cursor.execute(query)
@@ -196,12 +200,12 @@ def load_data() -> None:
                             app_id,
                             genre_id
                         ) VALUES (%s, %s);""",
-                    (appid, get_handle_null(genre, "id")),
+                    (appid, helpers.get_handle_null(genre, "id")),
                 )
                 cursor.execute(query)
 
         # Query that inserts into the dlc table if necissary.
-        dlc = get_handle_null(data, "dlc")
+        dlc = helpers.get_handle_null(data, "dlc")
         if dlc != None:
             logging.debug(f"dlc found for app:{appid}")
             if len(dlc) > 0:
@@ -220,7 +224,7 @@ def load_data() -> None:
                     cursor.execute(query)
 
         # Query that inserts developers table.
-        developers = get_handle_null(data, "developers")
+        developers = helpers.get_handle_null(data, "developers")
         if developers != None:
             logging.debug(f"developers found for app:{appid}")
             if len(developers) > 0:
@@ -239,7 +243,7 @@ def load_data() -> None:
                     cursor.execute(query)
 
         # Query that inserts into the publishers table.
-        publishers = get_handle_null(data, "publishers")
+        publishers = helpers.get_handle_null(data, "publishers")
         if publishers != None:
             if len(publishers) > 0:
                 for publisher in publishers:
@@ -257,7 +261,7 @@ def load_data() -> None:
                     cursor.execute(query)
 
         # Query that inserts in the prices table
-        price = get_handle_null(data, "price_overview")
+        price = helpers.get_handle_null(data, "price_overview")
         if price != None:
             query = cursor.mogrify(
                 """
@@ -271,14 +275,14 @@ def load_data() -> None:
                 """,
                 (
                     appid,
-                    get_handle_null(price, "initial"),
-                    get_handle_null(price, "final"),
+                    helpers.get_handle_null(price, "initial"),
+                    helpers.get_handle_null(price, "final"),
                 ),
             )
             cursor.execute(query)
 
         # Query that inserts into the packages table.
-        packages = get_handle_null(data, "packages")
+        packages = helpers.get_handle_null(data, "packages")
         if packages != None:
             for package in packages:
                 query = cursor.mogrify(
@@ -295,7 +299,7 @@ def load_data() -> None:
                 cursor.execute(query)
 
         # Query that inserts in the tags table.
-        categories = get_handle_null(data, "categories")
+        categories = helpers.get_handle_null(data, "categories")
         if categories != None:
             for tag in categories:
                 query = cursor.mogrify(
@@ -313,9 +317,9 @@ def load_data() -> None:
                         );
                     """,
                     (
-                        get_handle_null(tag, "id"),
-                        get_handle_null(tag, "description"),
-                        get_handle_null(tag, "id"),
+                        helpers.get_handle_null(tag, "id"),
+                        helpers.get_handle_null(tag, "description"),
+                        helpers.get_handle_null(tag, "id"),
                     ),
                 )
                 cursor.execute(query)
@@ -331,12 +335,12 @@ def load_data() -> None:
                             tag_id
                         ) VALUES (%s, %s);
                     """,
-                    (appid, get_handle_null(tag, "id")),
+                    (appid, helpers.get_handle_null(tag, "id")),
                 )
                 cursor.execute(query)
 
         # Query that inserts into the app_screenshots table
-        screenshots = get_handle_null(data, "screenshots")
+        screenshots = helpers.get_handle_null(data, "screenshots")
         if screenshots != None:
             for screenshot in screenshots:
                 query = cursor.mogrify(
@@ -351,19 +355,19 @@ def load_data() -> None:
                     """,
                     (
                         appid,
-                        get_handle_null(screenshot, "id"),
-                        get_handle_null(screenshot, "path_thumbnail"),
-                        get_handle_null(screenshot, "path_full"),
+                        helpers.get_handle_null(screenshot, "id"),
+                        helpers.get_handle_null(screenshot, "path_thumbnail"),
+                        helpers.get_handle_null(screenshot, "path_full"),
                     ),
                 )
                 cursor.execute(query)
 
         # Query that inserts into the movies table.
-        movies = get_handle_null(data, "movies")
+        movies = helpers.get_handle_null(data, "movies")
         if movies != None:
             for movie in movies:
-                webm = get_handle_null(movie, "webm")
-                mp4 = get_handle_null(movie, "mp4")
+                webm = helpers.get_handle_null(movie, "webm")
+                mp4 = helpers.get_handle_null(movie, "mp4")
                 query = cursor.mogrify(
                     """
                         INSERT INTO movies 
@@ -382,29 +386,29 @@ def load_data() -> None:
                     """,
                     (
                         appid,
-                        get_handle_null(movie, "id"),
-                        get_handle_null(movie, "name"),
-                        get_handle_null(movie, "thumbnail"),
-                        get_handle_null(webm, "480"),
-                        get_handle_null(webm, "max"),
-                        get_handle_null(mp4, "480"),
-                        get_handle_null(mp4, "max"),
-                        get_handle_null(movie, "highlight"),
+                        helpers.get_handle_null(movie, "id"),
+                        helpers.get_handle_null(movie, "name"),
+                        helpers.get_handle_null(movie, "thumbnail"),
+                        helpers.get_handle_null(webm, "480"),
+                        helpers.get_handle_null(webm, "max"),
+                        helpers.get_handle_null(mp4, "480"),
+                        helpers.get_handle_null(mp4, "max"),
+                        helpers.get_handle_null(movie, "highlight"),
                     ),
                 )
                 cursor.execute(query)
 
         # Query to add ratings to the ratings table.
-        ratings = get_handle_null(data, "ratings")
-        esrb = get_handle_null(ratings, "esrb")
-        oflc = get_handle_null(ratings, "oflc")
-        crl = get_handle_null(ratings, "crl")
-        usk = get_handle_null(ratings, "usk")
-        dejus = get_handle_null(ratings, "dejus")
-        cero = get_handle_null(ratings, "cero")
-        kgrb = get_handle_null(ratings, "kgrb")
-        csrr = get_handle_null(ratings, "cssr")
-        steam_germany = get_handle_null(ratings, "steam_germany")
+        ratings = helpers.get_handle_null(data, "ratings")
+        esrb = helpers.get_handle_null(ratings, "esrb")
+        oflc = helpers.get_handle_null(ratings, "oflc")
+        crl = helpers.get_handle_null(ratings, "crl")
+        usk = helpers.get_handle_null(ratings, "usk")
+        dejus = helpers.get_handle_null(ratings, "dejus")
+        cero = helpers.get_handle_null(ratings, "cero")
+        kgrb = helpers.get_handle_null(ratings, "kgrb")
+        csrr = helpers.get_handle_null(ratings, "cssr")
+        steam_germany = helpers.get_handle_null(ratings, "steam_germany")
         query = cursor.mogrify(
             """
                 INSERT INTO ratings 
@@ -446,38 +450,38 @@ def load_data() -> None:
             """,
             (
                 appid,
-                get_handle_null(esrb, "rating"),
-                get_handle_null(esrb, "descriptors"),
-                get_handle_null(esrb, "use_age_gate"),
-                get_handle_null(esrb, "required_age"),
-                get_handle_null(oflc, "rating"),
-                get_handle_null(oflc, "descriptors"),
-                get_handle_null(oflc, "use_age_gate"),
-                get_handle_null(oflc, "required_age"),
-                get_handle_null(crl, "rating"),
-                get_handle_null(crl, "descriptors"),
-                get_handle_null(crl, "use_age_gate"),
-                get_handle_null(crl, "required_age"),
-                get_handle_null(usk, "rating"),
-                get_handle_null(usk, "descriptors"),
-                get_handle_null(usk, "use_age_gate"),
-                get_handle_null(usk, "required_age"),
-                get_handle_null(usk, "rating_id"),
-                get_handle_null(dejus, "rating"),
-                get_handle_null(dejus, "descriptors"),
-                get_handle_null(dejus, "use_age_gate"),
-                get_handle_null(dejus, "required_age"),
-                get_handle_null(cero, "rating"),
-                get_handle_null(cero, "descriptors"),
-                get_handle_null(kgrb, "rating"),
-                get_handle_null(kgrb, "descriptors"),
-                get_handle_null(csrr, "rating"),
-                get_handle_null(csrr, "descriptors"),
-                get_handle_null(steam_germany, "rating"),
-                get_handle_null(steam_germany, "descriptors"),
-                get_handle_null(steam_germany, "use_age_gate"),
-                get_handle_null(steam_germany, "required_age"),
-                get_handle_null(steam_germany, "banned"),
+                helpers.get_handle_null(esrb, "rating"),
+                helpers.get_handle_null(esrb, "descriptors"),
+                helpers.get_handle_null(esrb, "use_age_gate"),
+                helpers.get_handle_null(esrb, "required_age"),
+                helpers.get_handle_null(oflc, "rating"),
+                helpers.get_handle_null(oflc, "descriptors"),
+                helpers.get_handle_null(oflc, "use_age_gate"),
+                helpers.get_handle_null(oflc, "required_age"),
+                helpers.get_handle_null(crl, "rating"),
+                helpers.get_handle_null(crl, "descriptors"),
+                helpers.get_handle_null(crl, "use_age_gate"),
+                helpers.get_handle_null(crl, "required_age"),
+                helpers.get_handle_null(usk, "rating"),
+                helpers.get_handle_null(usk, "descriptors"),
+                helpers.get_handle_null(usk, "use_age_gate"),
+                helpers.get_handle_null(usk, "required_age"),
+                helpers.get_handle_null(usk, "rating_id"),
+                helpers.get_handle_null(dejus, "rating"),
+                helpers.get_handle_null(dejus, "descriptors"),
+                helpers.get_handle_null(dejus, "use_age_gate"),
+                helpers.get_handle_null(dejus, "required_age"),
+                helpers.get_handle_null(cero, "rating"),
+                helpers.get_handle_null(cero, "descriptors"),
+                helpers.get_handle_null(kgrb, "rating"),
+                helpers.get_handle_null(kgrb, "descriptors"),
+                helpers.get_handle_null(csrr, "rating"),
+                helpers.get_handle_null(csrr, "descriptors"),
+                helpers.get_handle_null(steam_germany, "rating"),
+                helpers.get_handle_null(steam_germany, "descriptors"),
+                helpers.get_handle_null(steam_germany, "use_age_gate"),
+                helpers.get_handle_null(steam_germany, "required_age"),
+                helpers.get_handle_null(steam_germany, "banned"),
             ),
         )
         cursor.execute(query)
