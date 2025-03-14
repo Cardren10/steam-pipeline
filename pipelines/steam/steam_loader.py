@@ -23,7 +23,7 @@ class SteamLoader:
         end = time.time()
         logging.debug(f"Loader ran for {end - start} seconds")
 
-    def load_app_details() -> None:
+    def load_app_details(self) -> None:
         """Loops through all non-transformed app details for appids and loads the data into the schema."""
 
         conn = helpers.db_conn()
@@ -521,7 +521,7 @@ class SteamLoader:
 
         conn.close()
 
-    def load_app_reviews() -> None:
+    def load_app_reviews(self) -> None:
         conn = helpers.db_conn()
         cursor = conn.cursor()
         query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews'"
@@ -617,7 +617,7 @@ class SteamLoader:
 
         conn.close()
 
-    def load_app_tags() -> None:
+    def load_app_tags(self) -> None:
         conn = helpers.db_conn()
         cursor = conn.cursor()
         query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags'"
