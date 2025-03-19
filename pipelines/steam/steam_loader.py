@@ -29,21 +29,33 @@ class SteamLoader:
         conn = helpers.db_conn()
         cursor = conn.cursor()
         query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appdetails'"
+
+        query_start = time.time()
         cursor.execute(query)
+        query_end = time.time()
+        logging.debug(
+            f"Query [count non-transformed records] took {query_end - query_start} seconds"
+        )
+
         rows = cursor.fetchone()[0]
         logging.debug(f"rowcount: {rows}")
         conn.close()
 
         processed = 0
-        batch_size = 25
+        batch_size = 15
         while processed < rows:
             conn = helpers.db_conn()
             cursor = conn.cursor()
+
+            query_start = time.time()
             cursor.execute(
                 "SELECT id, app_id, app_data FROM steam_landing "
                 "WHERE transformed = '0' AND source = 'steam_api_appdetails' "
                 f"LIMIT {batch_size}"
             )
+            query_end = time.time()
+            logging.debug(f"Query [fetch batch] took {query_end - query_start} seconds")
+
             batch = cursor.fetchall()
             conn.close()
 
@@ -52,10 +64,17 @@ class SteamLoader:
                 cursor = conn.cursor()
                 if not helpers.validate_json(json_string):
                     logging.warning(f"Invalid JSON found for landing_id: {landing_id}")
+
+                    query_start = time.time()
                     cursor.execute(
                         "UPDATE steam_landing SET transformed = '1' WHERE id = %s",
                         (landing_id,),
                     )
+                    query_end = time.time()
+                    logging.debug(
+                        f"Query [update invalid JSON] took {query_end - query_start} seconds"
+                    )
+
                     continue
 
                 record = json.loads(json_string)
@@ -72,12 +91,27 @@ class SteamLoader:
                         """,
                         (app_id,),
                     )
-                    cursor.execute(query)
 
-                    cursor.execute(
+                    query_start = time.time()
+                    cursor.execute(query)
+                    query_end = time.time()
+                    logging.debug(
+                        f"Query [insert empty app] took {query_end - query_start} seconds"
+                    )
+
+                    query = cursor.mogrify(
                         "UPDATE steam_landing SET transformed = '1' WHERE id = %s",
                         (landing_id,),
                     )
+
+                    query_start = time.time()
+                    cursor.execute(query)
+                    query_end = time.time()
+                    logging.debug(
+                        f"Query [update empty app transformed] took {query_end - query_start} seconds"
+                    )
+
+                    conn.commit()
                     continue
 
                 data = app_json["data"]
@@ -183,7 +217,13 @@ class SteamLoader:
                         helpers.get_handle_null(data, "background_raw"),
                     ),
                 )
+
+                query_start = time.time()
                 cursor.execute(query)
+                query_end = time.time()
+                logging.debug(
+                    f"Query [insert app details] took {query_end - query_start} seconds"
+                )
 
                 # Query to update genres table if necessary
                 genres = helpers.get_handle_null(data, "genres")
@@ -197,18 +237,19 @@ class SteamLoader:
                                     genre
                                 )
                                 SELECT %s, %s
-                                WHERE NOT EXISTS (
-                                    SELECT 1
-                                    FROM genres
-                                    WHERE genres.genre_id = %s
-                                );""",
+                                ON CONFLICT (genre_id) DO NOTHING;""",
                             (
                                 helpers.get_handle_null(genre, "id"),
                                 helpers.get_handle_null(genre, "description"),
-                                helpers.get_handle_null(genre, "id"),
                             ),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert genre] took {query_end - query_start} seconds"
+                        )
 
                 # Query that inserts in the app_genres tables.
                 if genres != None:
@@ -223,7 +264,13 @@ class SteamLoader:
                                 ) VALUES (%s, %s);""",
                             (app_id, helpers.get_handle_null(genre, "id")),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert app_genre] took {query_end - query_start} seconds"
+                        )
 
                 # Query that inserts into the dlc table if necissary.
                 dlc = helpers.get_handle_null(data, "dlc")
@@ -242,7 +289,13 @@ class SteamLoader:
                                 """,
                                 (app_id, dlc_id),
                             )
+
+                            query_start = time.time()
                             cursor.execute(query)
+                            query_end = time.time()
+                            logging.debug(
+                                f"Query [insert dlc] took {query_end - query_start} seconds"
+                            )
 
                 # Query that inserts developers table.
                 developers = helpers.get_handle_null(data, "developers")
@@ -261,7 +314,13 @@ class SteamLoader:
                                 """,
                                 (app_id, dev),
                             )
+
+                            query_start = time.time()
                             cursor.execute(query)
+                            query_end = time.time()
+                            logging.debug(
+                                f"Query [insert developer] took {query_end - query_start} seconds"
+                            )
 
                 # Query that inserts into the publishers table.
                 publishers = helpers.get_handle_null(data, "publishers")
@@ -279,7 +338,13 @@ class SteamLoader:
                                 """,
                                 (app_id, publisher),
                             )
+
+                            query_start = time.time()
                             cursor.execute(query)
+                            query_end = time.time()
+                            logging.debug(
+                                f"Query [insert publisher] took {query_end - query_start} seconds"
+                            )
 
                 # Query that inserts in the prices table
                 price = helpers.get_handle_null(data, "price_overview")
@@ -300,7 +365,13 @@ class SteamLoader:
                             helpers.get_handle_null(price, "final"),
                         ),
                     )
+
+                    query_start = time.time()
                     cursor.execute(query)
+                    query_end = time.time()
+                    logging.debug(
+                        f"Query [insert price] took {query_end - query_start} seconds"
+                    )
 
                 # Query that inserts into the packages table.
                 packages = helpers.get_handle_null(data, "packages")
@@ -317,7 +388,13 @@ class SteamLoader:
                             """,
                             (app_id, package),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert package] took {query_end - query_start} seconds"
+                        )
 
                 # Query that inserts in the categories table.
                 categories = helpers.get_handle_null(data, "categories")
@@ -331,19 +408,20 @@ class SteamLoader:
                                     category
                                 )
                                 SELECT %s, %s
-                                WHERE NOT EXISTS (
-                                    SELECT 1
-                                    FROM categories
-                                    WHERE categories.category_id = %s
-                                );
+                                ON CONFLICT (category_id) DO NOTHING;
                             """,
                             (
                                 helpers.get_handle_null(category, "id"),
                                 helpers.get_handle_null(category, "description"),
-                                helpers.get_handle_null(category, "id"),
                             ),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert category] took {query_end - query_start} seconds"
+                        )
 
                 # Query that inserts in the app_categories tables.
                 if categories != None:
@@ -358,7 +436,13 @@ class SteamLoader:
                             """,
                             (app_id, helpers.get_handle_null(category, "id")),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert app_category] took {query_end - query_start} seconds"
+                        )
 
                 # Query that inserts into the app_screenshots table
                 screenshots = helpers.get_handle_null(data, "screenshots")
@@ -381,7 +465,13 @@ class SteamLoader:
                                 helpers.get_handle_null(screenshot, "path_full"),
                             ),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert screenshot] took {query_end - query_start} seconds"
+                        )
 
                 # Query that inserts into the movies table.
                 movies = helpers.get_handle_null(data, "movies")
@@ -417,7 +507,13 @@ class SteamLoader:
                                 helpers.get_handle_null(movie, "highlight"),
                             ),
                         )
+
+                        query_start = time.time()
                         cursor.execute(query)
+                        query_end = time.time()
+                        logging.debug(
+                            f"Query [insert movie] took {query_end - query_start} seconds"
+                        )
 
                 # Query to add ratings to the ratings table.
                 ratings = helpers.get_handle_null(data, "ratings")
@@ -505,7 +601,13 @@ class SteamLoader:
                         helpers.get_handle_null(steam_germany, "banned"),
                     ),
                 )
+
+                query_start = time.time()
                 cursor.execute(query)
+                query_end = time.time()
+                logging.debug(
+                    f"Query [insert ratings] took {query_end - query_start} seconds"
+                )
 
                 # Query to update the landing transformed value.
                 query = cursor.mogrify(
@@ -516,17 +618,28 @@ class SteamLoader:
                     """,
                     ("1", app_id, "steam_api_appdetails"),
                 )
+
+                query_start = time.time()
                 cursor.execute(query)
+                query_end = time.time()
+                logging.debug(
+                    f"Query [update landing transformed] took {query_end - query_start} seconds"
+                )
 
                 # Update steam landing to reflect transformation
+                query_start = time.time()
                 cursor.execute(
                     "UPDATE steam_landing SET transformed = '1' WHERE id = %s",
                     (landing_id,),
                 )
+                query_end = time.time()
+                logging.debug(
+                    f"Query [update landing id transformed] took {query_end - query_start} seconds"
+                )
 
+                conn.commit()
                 conn.close()
 
-            conn.commit()
             processed += len(batch)
             logging.info(f"Processed {processed}/{rows} app details")
 
@@ -692,16 +805,9 @@ class SteamLoader:
                             tag_id,
                             tag,
                         ) SELECT %s, %s
-                        WHERE NOT EXISTS (
-                            SELECT 1
-                            FROM tags
-                            WHERE tags.tag_id = %s
+                        ON CONFLICT (tag_id) DO NOTHING
                         );""",
-                    (
-                        v,
-                        k,
-                        v,
-                    ),
+                    (v, k),
                 )
                 cursor.execute(query)
 
