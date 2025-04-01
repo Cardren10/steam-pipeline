@@ -13,8 +13,8 @@ class SteamLoader:
 
         start = time.time()
 
-        # logging.debug("loading app details.")
-        # self.load_app_details()
+        logging.debug("loading app details.")
+        self.load_app_details()
         logging.debug("loading app reviews.")
         self.load_app_reviews()
         logging.debug("loading app tags.")
@@ -561,7 +561,6 @@ class SteamLoader:
             cursor.execute(query)
             record = cursor.fetchone()
             appid = record[1]
-            logging.debug(f"appid: {appid}")
             json_string = record[2]
             if not helpers.validate_json(json_string):
 
@@ -585,6 +584,7 @@ class SteamLoader:
                 continue
 
             app_json = json.loads(json_string)
+            logging.debug(f"json: {app_json}")
             if app_json.get("query_summary") == None:
                 logging.debug(f"app: {appid} has no data.")
 

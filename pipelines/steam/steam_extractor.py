@@ -110,7 +110,7 @@ class SteamExtractor:
         cursor = conn.cursor()
 
         for id in appids:
-            url = f"https://store.steampowered.com/appreviews/{id}"
+            url = f"https://store.steampowered.com/appreviews/{id}?json=1"
             try:
                 response = requests.get(url)
             except requests.exceptions.RequestException as e:
