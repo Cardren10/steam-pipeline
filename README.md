@@ -6,8 +6,5 @@ This project is a data pipeline for the popular video game store steam. The pipe
 ## Tools and Infrastructure
 * Database: PostgreSQL
 * Languages: Python, SQL, Bash
-* Vizualization: Tableau
 * Cloud: AWS
 * Containerization: Docker
-
-## Architecture
