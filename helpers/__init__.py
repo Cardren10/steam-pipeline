@@ -6,7 +6,8 @@ import logging
 import logging.config
 import logging.handlers
 import atexit
-from bs4 import BeautifulSoup
+from bs4 import BeautifulSoup, MarkupResemblesLocatorWarning
+import warnings
 
 
 def db_conn():
@@ -52,6 +53,7 @@ def validate_int(int_value):
 
 
 def clean_html(text) -> str:
+    warnings.filterwarnings("ignore", category=MarkupResemblesLocatorWarning)
     if text == None:
         return None
     soup = BeautifulSoup(text, "html.parser")
