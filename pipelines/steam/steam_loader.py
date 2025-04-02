@@ -2,6 +2,7 @@ import helpers
 import logging
 import json
 import time
+from psycopg2.extras import execute_values
 
 
 class SteamLoader:
@@ -33,14 +34,10 @@ class SteamLoader:
 
         rows = cursor.fetchone()[0]
         logging.debug(f"rowcount: {rows}")
-        conn.close()
 
         processed = 0
         batch_size = 10
         while processed < rows:
-            conn = helpers.db_conn()
-            cursor = conn.cursor()
-
             cursor.execute(
                 "SELECT id, app_id, app_data FROM steam_landing "
                 "WHERE transformed = '0' AND source = 'steam_api_appdetails' "
@@ -48,29 +45,19 @@ class SteamLoader:
             )
 
             batch = cursor.fetchall()
-            conn.close()
+            landing_ids_to_update = []
 
             for landing_id, app_id, json_string in batch:
-                conn = helpers.db_conn()
-                cursor = conn.cursor()
+                logging.debug(f"adding details to app: {app_id}")
                 if not helpers.validate_json(json_string):
                     logging.warning(f"Invalid JSON found for landing_id: {landing_id}")
 
-                    query_start = time.time()
-                    cursor.execute(
-                        "UPDATE steam_landing SET transformed = '1' WHERE id = %s",
-                        (landing_id,),
-                    )
-                    query_end = time.time()
-                    logging.debug(
-                        f"Query [update invalid JSON] took {query_end - query_start} seconds"
-                    )
-
+                    # add the landing id to update list
+                    landing_ids_to_update.append(landing_id)
                     continue
 
                 record = json.loads(json_string)
                 app_json = record[f"{app_id}"]
-
                 if app_json.get("data") == None:
                     logging.debug(f"app: {app_id} has no data.")
 
@@ -82,19 +69,13 @@ class SteamLoader:
                         """,
                         (app_id,),
                     )
-
                     cursor.execute(query)
 
-                    query = cursor.mogrify(
-                        "UPDATE steam_landing SET transformed = '1' WHERE id = %s",
-                        (landing_id,),
-                    )
-
-                    cursor.execute(query)
-
-                    conn.commit()
+                    # add the landing id to update list
+                    landing_ids_to_update.append(landing_id)
                     continue
 
+                landing_ids_to_update.append(landing_id)
                 data = app_json["data"]
 
                 # Query that inserts into the apps table.
@@ -201,101 +182,107 @@ class SteamLoader:
 
                 cursor.execute(query)
 
-                # Query to update genres table if necessary
+                # Query to update genres and app_genres table if necessary
                 genres = helpers.get_handle_null(data, "genres")
                 if genres != None:
+                    genre_values = []
+                    app_genres = []
+
                     for genre in genres:
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO genres 
-                                (
-                                    genre_id,
-                                    genre
-                                )
-                                SELECT %s, %s
-                                ON CONFLICT (genre_id) DO NOTHING;""",
+                        genre_values.append(
                             (
                                 helpers.get_handle_null(genre, "id"),
                                 helpers.get_handle_null(genre, "description"),
-                            ),
+                            )
+                        )
+                        app_genres.append(
+                            (
+                                app_id,
+                                helpers.get_handle_null(genre, "id"),
+                            )
                         )
 
-                        cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO genres (genre_id, genre)
+                            VALUES %s
+                            ON CONFLICT (genre_id) DO NOTHING;
+                        """,
+                        genre_values,
+                    )
 
-                # Query that inserts in the app_genres tables.
-                if genres != None:
-                    logging.debug(f"genres found for app:{app_id}")
-                    for genre in genres:
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO app_genres 
-                                (
-                                    app_id,
-                                    genre_id
-                                ) VALUES (%s, %s);""",
-                            (app_id, helpers.get_handle_null(genre, "id")),
-                        )
-
-                        cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO app_genres (app_id, genre_id)
+                            VALUES %s
+                        """,
+                        app_genres,
+                    )
 
                 # Query that inserts into the dlc table if necissary.
                 dlc = helpers.get_handle_null(data, "dlc")
-                if dlc != None:
-                    logging.debug(f"dlc found for app:{app_id}")
-                    if len(dlc) > 0:
-                        for dlc_id in dlc:
-                            query = cursor.mogrify(
-                                """
-                                    INSERT INTO dlcs
-                                    (
-                                        app_id,
-                                        dlc_id
-                                    )
-                                    VALUES (%s, %s);
-                                """,
-                                (app_id, dlc_id),
+                if dlc != None and len(dlc) > 0:
+                    dlc_values = []
+                    for dlc_id in dlc:
+                        dlc_values.append(
+                            (
+                                app_id,
+                                dlc_id,
                             )
+                        )
 
-                            cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO dlcs (app_id, dlc_id)
+                            VALUES %s
+                        """,
+                        dlc_values,
+                    )
 
                 # Query that inserts developers table.
                 developers = helpers.get_handle_null(data, "developers")
-                if developers != None:
-                    logging.debug(f"developers found for app:{app_id}")
-                    if len(developers) > 0:
-                        for dev in developers:
-                            query = cursor.mogrify(
-                                """
-                                    INSERT INTO developers
-                                    (
-                                        app_id,
-                                        developer
-                                    )
-                                    VALUES (%s, %s);
-                                """,
-                                (app_id, dev),
+                if developers != None and len(developers) > 0:
+                    dev_values = []
+                    for dev in developers:
+                        dev_values.append(
+                            (
+                                app_id,
+                                dev,
                             )
+                        )
 
-                            cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO developers (app_id, developer)
+                            VALUES %s
+                        """,
+                        dev_values,
+                    )
 
                 # Query that inserts into the publishers table.
                 publishers = helpers.get_handle_null(data, "publishers")
-                if publishers != None:
-                    if len(publishers) > 0:
-                        for publisher in publishers:
-                            query = cursor.mogrify(
-                                """
-                                    INSERT INTO publishers
-                                    (
-                                        app_id,
-                                        publisher
-                                    )
-                                    VALUES (%s, %s);
-                                """,
-                                (app_id, publisher),
+                if publishers != None and len(publishers) > 0:
+                    publisher_values = []
+                    for publisher in publishers:
+                        publisher_values.append(
+                            (
+                                app_id,
+                                publisher,
                             )
+                        )
 
-                            cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO publishers (app_id, publisher)
+                            VALUES %s
+                        """,
+                        publisher_values,
+                    )
 
                 # Query that inserts in the prices table
                 price = helpers.get_handle_null(data, "price_overview")
@@ -322,105 +309,93 @@ class SteamLoader:
                 # Query that inserts into the packages table.
                 packages = helpers.get_handle_null(data, "packages")
                 if packages != None:
+                    package_values = []
                     for package in packages:
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO packages
-                                (
-                                    app_id,
-                                    package_id
-                                )
-                                VALUES (%s, %s);
-                            """,
-                            (app_id, package),
+                        package_values.append(
+                            (
+                                app_id,
+                                package,
+                            )
                         )
 
-                        cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO packages (app_id, package_id)
+                            VALUES %s;
+                        """,
+                        package_values,
+                    )
 
-                # Query that inserts in the categories table.
+                # Query that inserts in the categories and app_categories table.
                 categories = helpers.get_handle_null(data, "categories")
                 if categories != None:
+                    category_values = []
+                    app_category_values = []
                     for category in categories:
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO categories 
-                                (
-                                    category_id,
-                                    category
-                                )
-                                SELECT %s, %s
-                                ON CONFLICT (category_id) DO NOTHING;
-                            """,
+                        category_values.append(
                             (
                                 helpers.get_handle_null(category, "id"),
                                 helpers.get_handle_null(category, "description"),
-                            ),
+                            )
+                        )
+                        app_category_values.append(
+                            (
+                                app_id,
+                                helpers.get_handle_null(category, "id"),
+                            )
                         )
 
-                        cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO categories (category_id, category)
+                            VALUES %s
+                            ON CONFLICT (category_id) DO NOTHING; 
+                        """,
+                        category_values,
+                    )
 
-                # Query that inserts in the app_categories tables.
-                if categories != None:
-                    for category in categories:
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO app_categories 
-                                (
-                                    app_id,
-                                    category_id
-                                ) VALUES (%s, %s);
-                            """,
-                            (app_id, helpers.get_handle_null(category, "id")),
-                        )
-
-                        cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO app_categories (app_id, category_id)
+                            VALUES %s
+                        """,
+                        app_category_values,
+                    )
 
                 # Query that inserts into the app_screenshots table
                 screenshots = helpers.get_handle_null(data, "screenshots")
-                if screenshots != None:
+                if screenshots != None and len(screenshots) > 0:
+                    screenshot_values = []
                     for screenshot in screenshots:
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO app_screenshots 
-                                (
-                                    app_id,
-                                    app_screenshots_id,
-                                    path_thumbnail,
-                                    path_full
-                                ) VALUES (%s, %s, %s, %s)
-                            """,
+                        screenshot_values.append(
                             (
                                 app_id,
                                 helpers.get_handle_null(screenshot, "id"),
                                 helpers.get_handle_null(screenshot, "path_thumbnail"),
                                 helpers.get_handle_null(screenshot, "path_full"),
-                            ),
+                            )
                         )
 
-                        cursor.execute(query)
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO app_screenshots (app_id, app_screenshots_id, path_thumbnail, path_full)
+                            VALUES %s
+                        """,
+                        screenshot_values,
+                    )
 
                 # Query that inserts into the movies table.
                 movies = helpers.get_handle_null(data, "movies")
-                if movies != None:
+                if movies != None and len(movies) > 0:
+                    movie_values = []
                     for movie in movies:
                         webm = helpers.get_handle_null(movie, "webm")
                         mp4 = helpers.get_handle_null(movie, "mp4")
-                        query = cursor.mogrify(
-                            """
-                                INSERT INTO movies 
-                                (
-                                    app_id,
-                                    movie_id,
-                                    movie_name,
-                                    thumbnail,
-                                    webm_480,
-                                    webm_max,
-                                    mp4_480,
-                                    mp4_max,
-                                    highlight
-                                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                                ON CONFLICT (movie_id) DO NOTHING;
-                            """,
+                        movie_values.append(
                             (
                                 app_id,
                                 helpers.get_handle_null(movie, "id"),
@@ -431,9 +406,18 @@ class SteamLoader:
                                 helpers.get_handle_null(mp4, "480"),
                                 helpers.get_handle_null(mp4, "max"),
                                 helpers.get_handle_null(movie, "highlight"),
-                            ),
+                            )
                         )
-                        cursor.execute(query)
+
+                    execute_values(
+                        cursor,
+                        """
+                            INSERT INTO movies(app_id, movie_id, movie_name, thumbnail, webm_480, webm_max, mp4_480, mp4_max, highlight)
+                            VALUES %s
+                            ON CONFLICT (movie_id) DO NOTHING;
+                        """,
+                        movie_values,
+                    )
 
                 # Query to add ratings to the ratings table.
                 ratings = helpers.get_handle_null(data, "ratings")
@@ -524,216 +508,189 @@ class SteamLoader:
 
                 cursor.execute(query)
 
-                # Query to update the landing transformed value.
-                query = cursor.mogrify(
-                    """
-                        UPDATE steam_landing
-                        SET transformed = %s
-                        WHERE app_id = %s AND source = %s
-                    """,
-                    ("1", app_id, "steam_api_appdetails"),
-                )
-
-                cursor.execute(query)
-
-                # Update steam landing to reflect transformation
+            # Update steam landing to reflect transformation
+            if landing_ids_to_update:
                 cursor.execute(
-                    "UPDATE steam_landing SET transformed = '1' WHERE id = %s",
-                    (landing_id,),
+                    "UPDATE steam_landing SET transformed = '1' WHERE id = ANY(%s)",
+                    (landing_ids_to_update,),
                 )
 
-                conn.commit()
-                conn.close()
+            conn.commit()
 
             processed += len(batch)
             logging.info(f"Processed {processed}/{rows} app details")
+        conn.close()
 
     def load_app_reviews(self) -> None:
+
         conn = helpers.db_conn()
         cursor = conn.cursor()
         query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews'"
         cursor.execute(query)
+
         rows = cursor.fetchone()[0]
         logging.debug(f"rowcount: {rows}")
 
-        for row in range(rows):
-            query = "SELECT id, app_id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews' LIMIT 1"
-            cursor.execute(query)
-            record = cursor.fetchone()
-            appid = record[1]
-            json_string = record[2]
-            if not helpers.validate_json(json_string):
+        processed = 0
+        batch_size = 10
+        while processed < rows:
+            cursor.execute(
+                "SELECT id, app_id, app_data FROM steam_landing "
+                "WHERE transformed = '0' AND source = 'steam_api_appreviews' "
+                f"LIMIT {batch_size}"
+            )
 
-                query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steam_api_appreviews' LIMIT 1"
-                cursor.execute(query)
-                landing_id = cursor.fetchone()[0]
-                logging.warning(f"Invalid json found for landing_id: {landing_id}")
+            batch = cursor.fetchall()
+            landing_ids_to_update = []
 
-                # Update steam_landing to transformed
+            for landing_id, app_id, json_string in batch:
+
+                if not helpers.validate_json(json_string):
+                    logging.warning(f"Invalid json found for landing_id: {landing_id}")
+                    landing_ids_to_update.append(landing_id)
+                    continue
+
+                app_json = json.loads(json_string)
+                if app_json.get("query_summary") == None:
+                    logging.debug(f"app: {app_id} has no data.")
+                    landing_ids_to_update.append(landing_id)
+                    continue
+
+                # add landing id to update list
+                landing_ids_to_update.append(landing_id)
+
+                data = app_json["query_summary"]
+
+                # Query that inserts into the reviews table.
                 query = cursor.mogrify(
                     """
-                    UPDATE steam_landing
-                    SET transformed = %s
-                    WHERE id = %s
+                        INSERT INTO reviews 
+                        (
+                            app_id,
+                            review_score,
+                            review_score_desc,
+                            total_positive,
+                            total_negative,
+                            total_reviews
+                        ) 
+                        VALUES (%s, %s, %s, %s, %s, %s);
                     """,
-                    ("1", landing_id),
-                )
-                cursor.execute(query)
-
-                conn.commit()
-                continue
-
-            app_json = json.loads(json_string)
-            logging.debug(f"json: {app_json}")
-            if app_json.get("query_summary") == None:
-                logging.debug(f"app: {appid} has no data.")
-
-                # Update steam_landing to transformed
-                query = cursor.mogrify(
-                    """
-                    UPDATE steam_landing
-                    SET transformed = %s
-                    WHERE app_id = %s AND source = %s
-                    """,
-                    ("1", appid, "steam_api_appreviews"),
-                )
-                cursor.execute(query)
-
-                conn.commit()
-                continue
-
-            data = app_json["query_summary"]
-
-            # Query that inserts into the reviews table.
-            query = cursor.mogrify(
-                """
-                    INSERT INTO reviews 
                     (
                         app_id,
-                        review_score,
-                        review_score_desc,
-                        total_positive,
-                        total_negative,
-                        total_reviews,
-                    ) VALUES (%s, %s, %s, %s, %s, %s);""",
-                (
-                    appid,
-                    helpers.get_handle_null(data, "review_score"),
-                    helpers.get_handle_null(data, "review_score_desc"),
-                    helpers.get_handle_null(data, "total_positive"),
-                    helpers.get_handle_null(data, "total_negative"),
-                    helpers.get_handle_null(data, "total_reviews"),
-                ),
-            )
-            cursor.execute(query)
+                        helpers.get_handle_null(data, "review_score"),
+                        helpers.get_handle_null(data, "review_score_desc"),
+                        helpers.get_handle_null(data, "total_positive"),
+                        helpers.get_handle_null(data, "total_negative"),
+                        helpers.get_handle_null(data, "total_reviews"),
+                    ),
+                )
+                cursor.execute(query)
 
-            # Query to update the landing transformed value.
-            query = cursor.mogrify(
-                """
-                    UPDATE steam_landing
-                    SET transformed = %s
-                    WHERE app_id = %s AND source = %s
-                """,
-                ("1", appid, "steam_api_appreviews"),
-            )
-            cursor.execute(query)
+            # Update steam landing to reflect transformation
+            if landing_ids_to_update:
+                cursor.execute(
+                    "UPDATE steam_landing SET transformed = '1' WHERE id = ANY(%s)",
+                    (landing_ids_to_update,),
+                )
+
+            processed += len(batch)
+            logging.info(f"Processed {processed}/{rows} app details")
 
             # When Psycopg2 executes a query it does so as a transaction that does not complete until commit is run. Any failure before this should send an error that includes what appid specifically failed.
             conn.commit()
 
-        conn.close()
+            conn.close()
 
     def load_app_tags(self) -> None:
         conn = helpers.db_conn()
         cursor = conn.cursor()
         query = "SELECT count(*) FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags'"
         cursor.execute(query)
+
         rows = cursor.fetchone()[0]
         logging.debug(f"rowcount: {rows}")
 
-        for row in range(rows):
-            query = "SELECT id, app_id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags' LIMIT 1"
-            cursor.execute(query)
-            record = cursor.fetchone()
-            json_string = record[2]
-            if not helpers.validate_json(json_string):
+        processed = 0
+        batch_size = 10
+        while processed < rows:
 
-                query = "SELECT id, app_data FROM steam_landing WHERE transformed = '0' AND source = 'steamspy_tags' LIMIT 1"
-                cursor.execute(query)
-                landing_id = cursor.fetchone()[0]
-                logging.warning(f"Invalid json found for landing_id: {landing_id}")
-
-                # Update steam_landing to transformed
-                query = cursor.mogrify(
-                    """
-                    UPDATE steam_landing
-                    SET transformed = %s
-                    WHERE id = %s
-                    """,
-                    ("1", landing_id),
-                )
-                cursor.execute(query)
-
-                conn.commit()
-                continue
-
-            appid = record[1]
-            logging.debug(f"appid: {appid}")
-            app_json = json.loads(json_string)
-
-            if app_json.get("tags") == None:
-                logging.debug(f"app: {appid} has no data.")
-
-                # Update steam_landing to transformed
-                query = cursor.mogrify(
-                    """
-                    UPDATE steam_landing
-                    SET transformed = %s
-                    WHERE app_id = %s AND source = %s
-                    """,
-                    ("1", appid, "steamspy_tags"),
-                )
-                cursor.execute(query)
-
-                conn.commit()
-                continue
-
-            # Query that inserts into the tags table.
-            tags = app_json["tags"]
-
-            for k, v in tags:
-                query = cursor.mogrify(
-                    """
-                        INSERT INTO tags 
-                        (
-                            tag_id,
-                            tag,
-                        ) SELECT %s, %s
-                        ON CONFLICT (tag_id) DO NOTHING
-                        );""",
-                    (v, k),
-                )
-                cursor.execute(query)
-
-            for k, v in tags:
-                query = cursor.mogrify(
-                    """
-                        INSERT INTO app_tags
-                        VALUES (%s, %s);
-                    """,
-                    (appid, v),
-                )
-
-            # Query to update the landing transformed value.
-            query = cursor.mogrify(
-                """
-                    UPDATE steam_landing
-                    SET transformed = %s
-                    WHERE app_id = %s AND source = %s
-                """,
-                ("1", appid, "steamspy_tags"),
+            cursor.execute(
+                "SELECT id, app_id, app_data FROM steam_landing "
+                "WHERE transformed = '0' AND source = 'steamspy_tags' "
+                f"LIMIT {batch_size}"
             )
-            cursor.execute(query)
+
+            batch = cursor.fetchall()
+            landing_ids_to_update = []
+
+            for landing_id, app_id, json_string in batch:
+                logging.debug(f"adding tags to app: {app_id}")
+                app_json = json.loads(json_string)
+
+                if not helpers.validate_json(json_string):
+                    logging.warning(f"Invalid json found for landing_id: {landing_id}")
+                    landing_ids_to_update.append(landing_id)
+                    continue
+
+                if app_json.get("tags") == None:
+                    logging.debug(f"app: {app_id} has no data.")
+                    landing_ids_to_update.append(landing_id)
+                    continue
+
+                tags = app_json["tags"]
+
+                if len(tags) == 0:
+                    logging.debug(f"app: {app_id} has no tags.")
+                    landing_ids_to_update.append(landing_id)
+                    continue
+
+                # Query that inserts into the tags table.
+
+                tag_values = []
+                app_tag_values = []
+
+                for k, v in tags.items():
+                    tag_values.append(
+                        (
+                            v,
+                            k,
+                        )
+                    )
+                    app_tag_values.append(
+                        (
+                            app_id,
+                            v,
+                        )
+                    )
+
+                execute_values(
+                    cursor,
+                    """
+                        INSERT INTO tags (tag_id, tag)
+                        VALUES %s
+                        ON CONFLICT (tag_id) DO NOTHING;
+                    """,
+                    tag_values,
+                )
+
+                execute_values(
+                    cursor,
+                    """
+                        INSERT INTO app_tags (app_id, tag_id)
+                        VALUES %s;
+                    """,
+                    app_tag_values,
+                )
+
+            # Update steam landing to reflect transformation
+            if landing_ids_to_update:
+                cursor.execute(
+                    "UPDATE steam_landing SET transformed = '1' WHERE id = ANY(%s)",
+                    (landing_ids_to_update,),
+                )
+
+            processed += len(batch)
+            logging.info(f"Processed {processed}/{rows} app details")
 
             # When Psycopg2 executes a query it does so as a transaction that does not complete until commit is run. Any failure before this should send an error that includes what appid specifically failed.
             conn.commit()
