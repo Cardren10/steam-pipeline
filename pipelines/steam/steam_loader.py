@@ -38,11 +38,15 @@ class SteamLoader:
         processed = 0
         batch_size = 10
         while processed < rows:
-            cursor.execute(
-                "SELECT id, app_id, app_data FROM steam_landing "
-                "WHERE transformed = '0' AND source = 'steam_api_appdetails' "
-                f"LIMIT {batch_size}"
+            query = cursor.mogrify(
+                """
+                    SELECT id, app_id, app_data FROM steam_landing "
+                    "WHERE transformed = '0' AND source = 'steam_api_appdetails'
+                    LIMIT %s;
+                """,
+                (batch_size,),
             )
+            cursor.execute(query)
 
             batch = cursor.fetchall()
             landing_ids_to_update = []
@@ -51,9 +55,15 @@ class SteamLoader:
                 logging.debug(f"adding details to app: {app_id}")
                 if not helpers.validate_json(json_string):
                     logging.warning(f"Invalid JSON found for landing_id: {landing_id}")
-
-                    # add the landing id to update list
-                    landing_ids_to_update.append(landing_id)
+                    # Delete the invalid row
+                    query = cursor.mogrify(
+                        """
+                            DELETE FROM steam_landing
+                            WHERE id = %s;
+                        """,
+                        (landing_id,),
+                    )
+                    cursor.execute(query)
                     continue
 
                 record = json.loads(json_string)
@@ -547,7 +557,15 @@ class SteamLoader:
 
                 if not helpers.validate_json(json_string):
                     logging.warning(f"Invalid json found for landing_id: {landing_id}")
-                    landing_ids_to_update.append(landing_id)
+                    # Delete the invalid row
+                    query = cursor.mogrify(
+                        """
+                            DELETE FROM steam_landing
+                            WHERE id = %s;
+                        """,
+                        (landing_id,),
+                    )
+                    cursor.execute(query)
                     continue
 
                 app_json = json.loads(json_string)
@@ -560,6 +578,17 @@ class SteamLoader:
                 landing_ids_to_update.append(landing_id)
 
                 data = app_json["query_summary"]
+
+                # upsert in case of no apps.
+                app_query = cursor.mogrify(
+                    """
+                        INSERT INTO apps (app_id)
+                        VALUES (%s)
+                        ON CONFLICT (app_id) DO NOTHING;
+                    """,
+                    (app_id,),
+                )
+                cursor.execute(app_query)
 
                 # Query that inserts into the reviews table.
                 query = cursor.mogrify(
@@ -594,12 +623,12 @@ class SteamLoader:
                 )
 
             processed += len(batch)
-            logging.info(f"Processed {processed}/{rows} app details")
+            logging.info(f"Processed {processed}/{rows} app reviews")
 
             # When Psycopg2 executes a query it does so as a transaction that does not complete until commit is run. Any failure before this should send an error that includes what appid specifically failed.
             conn.commit()
 
-            conn.close()
+        conn.close()
 
     def load_app_tags(self) -> None:
         conn = helpers.db_conn()
@@ -629,7 +658,15 @@ class SteamLoader:
 
                 if not helpers.validate_json(json_string):
                     logging.warning(f"Invalid json found for landing_id: {landing_id}")
-                    landing_ids_to_update.append(landing_id)
+                    # Delete the invalid row
+                    query = cursor.mogrify(
+                        """
+                            DELETE FROM steam_landing
+                            WHERE id = %s;
+                        """,
+                        (landing_id,),
+                    )
+                    cursor.execute(query)
                     continue
 
                 if app_json.get("tags") == None:
@@ -644,8 +681,18 @@ class SteamLoader:
                     landing_ids_to_update.append(landing_id)
                     continue
 
-                # Query that inserts into the tags table.
+                # upsert in case of missing app
+                app_query = cursor.mogrify(
+                    """
+                    INSERT INTO apps (app_id)
+                    VALUES (%s)
+                    ON CONFLICT (app_id) DO NOTHING;
+                    """,
+                    (app_id,),
+                )
+                cursor.execute(app_query)
 
+                # Query that inserts into the tags table.
                 tag_values = []
                 app_tag_values = []
 
@@ -690,7 +737,7 @@ class SteamLoader:
                 )
 
             processed += len(batch)
-            logging.info(f"Processed {processed}/{rows} app details")
+            logging.info(f"Processed {processed}/{rows} app tags")
 
             # When Psycopg2 executes a query it does so as a transaction that does not complete until commit is run. Any failure before this should send an error that includes what appid specifically failed.
             conn.commit()
