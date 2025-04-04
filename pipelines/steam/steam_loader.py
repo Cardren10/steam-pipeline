@@ -681,6 +681,9 @@ class SteamLoader:
                     landing_ids_to_update.append(landing_id)
                     continue
 
+                # add the id to update list.
+                landing_ids_to_update.append(landing_id)
+
                 # upsert in case of missing app
                 app_query = cursor.mogrify(
                     """
