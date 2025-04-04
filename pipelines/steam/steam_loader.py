@@ -654,7 +654,6 @@ class SteamLoader:
 
             for landing_id, app_id, json_string in batch:
                 logging.debug(f"adding tags to app: {app_id}")
-                app_json = json.loads(json_string)
 
                 if not helpers.validate_json(json_string):
                     logging.warning(f"Invalid json found for landing_id: {landing_id}")
@@ -668,6 +667,8 @@ class SteamLoader:
                     )
                     cursor.execute(query)
                     continue
+
+                app_json = json.loads(json_string)
 
                 if app_json.get("tags") == None:
                     logging.debug(f"app: {app_id} has no data.")
