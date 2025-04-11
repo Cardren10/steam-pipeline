@@ -59,9 +59,9 @@ class SteamLoader:
                     query = cursor.mogrify(
                         """
                             DELETE FROM steam_landing
-                            WHERE id = %s;
+                            WHERE id = %s AND app_id = %s;
                         """,
-                        (landing_id,),
+                        (landing_id, app_id),
                     )
                     cursor.execute(query)
                     continue
@@ -133,7 +133,40 @@ class SteamLoader:
                             support_email,
                             background,
                             background_raw
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s);""",
+                            ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                            ON CONFLICT (app_id) DO UPDATE SET
+                            app_name = EXCLUDED.app_name,
+                            app_type = EXCLUDED.app_type,
+                            required_age = EXCLUDED.required_age,
+                            is_free = EXCLUDED.is_free,
+                            controller_support = EXCLUDED.controller_support,
+                            detailed_description = EXCLUDED.detailed_description,
+                            about_the_game = EXCLUDED.about_the_game,
+                            short_description = EXCLUDED.short_description,
+                            supported_languages = EXCLUDED.supported_languages,
+                            reviews = EXCLUDED.reviews,
+                            header_image = EXCLUDED.header_image,
+                            capsule_image = EXCLUDED.capsule_image,
+                            capsule_imagev5 = EXCLUDED.capsule_imagev5,
+                            website = EXCLUDED.website,
+                            pc_requirements_minimum = EXCLUDED.pc_requirements_minimum,
+                            pc_requirements_recommended = EXCLUDED.pc_requirements_recommended,
+                            mac_requirements_minimum = EXCLUDED.mac_requirements_minimum,
+                            mac_requirements_recommended = EXCLUDED.mac_requirements_recommended,
+                            linux_requirements_minimum = EXCLUDED.linux_requirements_minimum,
+                            linux_requirements_recommended = EXCLUDED.linux_requirements_recommended,
+                            legal_notice = EXCLUDED.legal_notice,
+                            platform_windows = EXCLUDED.platform_windows,
+                            platform_mac = EXCLUDED.platform_mac,
+                            platform_linux = EXCLUDED.platform_linux,
+                            total_achievements = EXCLUDED.total_achievements,
+                            coming_soon = EXCLUDED.coming_soon,
+                            release_date = EXCLUDED.release_date,
+                            support_url = EXCLUDED.support_url,
+                            support_email = EXCLUDED.support_email,
+                            background = EXCLUDED.background,
+                            background_raw = EXCLUDED.background_raw;
+                        """,
                     (
                         app_id,
                         helpers.get_handle_null(data, "name"),
@@ -561,9 +594,9 @@ class SteamLoader:
                     query = cursor.mogrify(
                         """
                             DELETE FROM steam_landing
-                            WHERE id = %s;
+                            WHERE id = %s AND app_id = %s;
                         """,
-                        (landing_id,),
+                        (landing_id, app_id),
                     )
                     cursor.execute(query)
                     continue
@@ -617,6 +650,7 @@ class SteamLoader:
 
             # Update steam landing to reflect transformation
             if landing_ids_to_update:
+                logging.debug("Updating landing ids.")
                 cursor.execute(
                     "UPDATE steam_landing SET transformed = '1' WHERE id = ANY(%s)",
                     (landing_ids_to_update,),
@@ -661,9 +695,9 @@ class SteamLoader:
                     query = cursor.mogrify(
                         """
                             DELETE FROM steam_landing
-                            WHERE id = %s;
+                            WHERE id = %s AND app_id = %s;
                         """,
-                        (landing_id,),
+                        (landing_id, app_id),
                     )
                     cursor.execute(query)
                     continue
